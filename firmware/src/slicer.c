@@ -3,7 +3,7 @@
 /* SLICER: a per-track insert, a tempo-synced 16-step gate / stutter. It works on the track's dry
  * mono signal after DIST and before LEVEL / PAN / the sends (fx.c mix_part), so the sends follow
  * the chopped sound.
- *   P_SLCR    OFF / GATE / STUT
+ *   P_SLCR    OFF / GATE / STUT / PUMP (NEON)
  *   P_SLPAT   one of SL_NPAT patterns of 16 steps ('x' live / open, '.' gated / repeated)
  *   P_SLRATE  the step: 1/8, 1/16, 1/32, 8T, 16T, 32T
  *   P_SLDEPTH GATE: how far a '.' step closes (100 % = silent); STUT: the level of the repeat
@@ -13,6 +13,10 @@
  *   step plays that recording from its start, looped at the step length (halved until it fits the
  *   recording), cross-faded with the live sound by DEPTH. Every pass of the loop is windowed
  *   (SL_RAMP at both ends and at the step end), the cross-fade moves as the gate does.
+ * PUMP (NEON): the sidechain pump of synthwave without a sidechain: on every beat the track ducks (in 0.7 ms, by DEPTH:
+ *   100 % to silence) and swells back, a curve as long as PAT says (1: 0.4 beat .. 8: a beat .. 16: 1.7 beats; it never
+ *   quite ends before the next beat on the long ones: the breathing pad). The step is the beat (RATE and the pattern
+ *   are not used), so it pumps with the kick of a four-on-the-floor at any tempo.
  * The step clock: per track, always running (also with the SLICER OFF, so switching it on lands
  * in time), restarted with the transport (seq_start -> slicer_start: step 0 starts with the
  * sequencer's step 0), BPM and the track's + the global SWING as the sequencer has them (seq.c
@@ -22,7 +26,7 @@
 #define SL_RAMP_LOG2 7
 #define SL_RAMP (1 << SL_RAMP_LOG2)     /* 128 samples, 2.9 ms */
 #define SL_SLOPE (32768 / SL_RAMP)
-enum { SL_OFF, SL_GATE, SL_STUT };      /* P_SLCR (params.c N_SLCR) */
+enum { SL_OFF, SL_GATE, SL_STUT, SL_PUMP };   /* P_SLCR (params.c N_SLCR) */
 
 /* bit k = step k: 1 = 'x' (open / live), 0 = '.' (closed / repeat) */
 static const uint16_t SL_PAT[SL_NPAT] = {
@@ -57,6 +61,8 @@ typedef struct {
     uint8_t idx;                 /* step 0..15 */
     uint8_t bit;                 /* this step's pattern bit (latched at its start) */
     uint8_t rec_on;              /* recording this step */
+    uint8_t psh;                 /* PUMP: the swell's speed (the closure falls by >> psh a sample) */
+    int32_t pa;                  /* PUMP: the duck still to come in (the attack's target), 0: swelling back */
 } sl_t;
 static sl_t sl[NTRK];
 static uint8_t sl_lent;          /* perform.c has borrowed sl_buf: STUT plays live, records nothing */
@@ -77,6 +83,22 @@ static void sl_enter(const track_t *t, sl_t *s)
 {
     uint32_t mode = (uint32_t)t->p[P_SLCR];
     s->idx = (uint8_t)((s->idx + 1u) & 15u);
+    if (mode == SL_PUMP) {                          /* a beat a step; the duck at its start */
+        uint32_t rel, sh = 0;
+        s->base = (uint32_t)FS * 60u / (uint32_t)song.g[G_BPM];
+        s->len = s->base;
+        rel = s->base * (4u + (uint32_t)clamp(t->p[P_SLPAT], 1, 16)) / 12u / 3u;   /* ~95 % back in 3 x this */
+        while ((2u << sh) <= rel)
+            sh++;
+        s->psh = (uint8_t)(sh ? sh : 1u);
+        s->pa = t->p[P_SLDEPTH] * 258;
+        s->pos = 0;
+        s->bit = 1;
+        s->rp = s->loop = 0;
+        s->rec_on = 0;
+        s->rec = 0;
+        return;
+    }
     s->base = (uint32_t)FS * 60u / (uint32_t)song.g[G_BPM] / SL_DEN[(uint32_t)t->p[P_SLRATE] % 6u];
     s->len = swing_step_len(t, s->base, s->idx);   /* core.h, as seq.c step_samples */
     s->pos = 0;
@@ -108,6 +130,28 @@ static inline __attribute__((always_inline)) void sl_seg(const track_t *t, sl_t 
     int32_t tc = mode == SL_GATE && !s->bit ? depth : 0;           /* gate closure of this step */
     int32_t tn = mode == SL_GATE && !nbit ? depth : 0;             /* .. of the next one */
     int32_t tw = mode == SL_STUT && s->loop ? depth : 0;           /* repeat level */
+    if (mode == SL_PUMP) {                          /* NEON PUMP: in fast, then the swell back */
+        for (j = 0; j < m; j++) {
+            int32_t x = b[j];
+            if (s->pa) {
+                s->gc += 4 * SL_SLOPE;
+                if (s->gc >= s->pa) {
+                    s->gc = s->pa;
+                    s->pa = 0;
+                }
+            } else {
+                s->gc -= (s->gc >> s->psh) + (s->gc > 0);
+            }
+            if (s->w)                               /* (a STUT repeat that was fading: gone) */
+                s->w = 0;
+            if (s->gc > 0) {
+                b[j] = x - mulq16(x, (uint32_t)s->gc << 1);
+                if (sd)
+                    sd[j] -= mulq16(sd[j], (uint32_t)s->gc << 1);
+            }
+        }
+        return;
+    }
     for (j = 0; j < m; j++) {
         int32_t x = b[j], y, tg = tc;
         uint32_t left = s->len - s->pos - j;        /* samples to the step end, >= 1 */

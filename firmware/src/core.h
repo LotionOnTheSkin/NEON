@@ -371,6 +371,11 @@ typedef struct {
                                   * zeroed default, is T1..T4 on channels 1..4), MCH_OMNI (any channel no track has), MCH_OFF
                                   * (none); mch_get / mch_set. The project's, in FUN10's spare bytes (project.c PROJ_MIDI_OFF);
                                   * MENU > MIDI > T1..T4 CHANNEL */
+    /* NEON HARMONY (prog.c): the progression the PROG tracks follow, the project's (project.c PROJ_PROG_OFF) */
+    uint8_t prog[8];             /* each chord a degree of the scale, 0 (i) .. 6 (VII); 7 ends the progression */
+    uint8_t prog_bars;           /* bars a chord: 0 1, 1 2, 2 4 */
+    uint8_t prog_mood;           /* the MOOD it came from (prog.c MOOD_*), 0 OWN: edited */
+    uint8_t prog_cur;            /* the PROG page's SLOT: the chord the keys play while stopped */
 } song_t;
 #define ROUTE_SEL 1
 #define ROUTE_TRACK 5                /* G_ROUTE: TRACK, each track on its own channel (song.mch) */

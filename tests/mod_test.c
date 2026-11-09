@@ -481,7 +481,7 @@ static double cost(const uint8_t parts[NPART][3], int on)
 
 static void test_cost(void)
 {
-    uint32_t e_phys = eng_by_name("PHYS"), pp = preset_by_name(e_phys, "BOWED METAL");
+    uint32_t e_phys = eng_by_name("PHYS"), pp = preset_by_name(e_phys, "STEEL PAD");
     uint8_t phys[NPART][3] = {{(uint8_t)e_phys, (uint8_t)pp, 8}}, idle[NPART][3] = {{0}};
     uint8_t mix[NPART][3] = {{1, 0, 8}, {2, 0, 8}, {(uint8_t)e_phys, (uint8_t)pp, 4}, {6, 0, 4}};
     double c_idle, c0, c1, m0, m1;
@@ -561,7 +561,7 @@ static int demos(const char *dir)
     }
     /* MODW -> VIB: LOFI WAVE LEAD, the mod wheel (CC1) rises over 4 s: vibrato from none to deep */
     e = eng_by_name("LOFI");
-    fresh(e, preset_by_name(e, "WAVE LEAD"));
+    fresh(e, preset_by_name(e, "VOX CHIP"));
     t->p[P_LRATE] = 70;
     t->p[P_LD_PIT] = 0;
     t->p[P_LFADE] = 0;
@@ -580,7 +580,7 @@ static int demos(const char *dir)
     }
     /* LFO -> TRIO PW: TRIO ARP LEAD's pulse width swept by a triangle LFO */
     e = eng_by_name("TRIO");
-    fresh(e, preset_by_name(e, "ARP LEAD"));
+    fresh(e, preset_by_name(e, "HYPER LEAD"));
     t->p[P_LRATE] = 45;
     t->p[P_LWAVE] = 1;
     t->p[P_AMODE] = 0;

@@ -963,6 +963,72 @@ static void step_edit(uint32_t slot, int32_t steps)
         motion_undo_done(TSEL);
 }
 
+/* NEON HARMONY's page (PROG, params.c prog_ui): a knob's turn into the song's progression. MOOD loads one and sets every
+ * melodic track (not a kit) to follow it (QNT PROG); SLOT picks the chord to edit (and, stopped, the one the keys play);
+ * CHORD sets it (OWN from then; "-" ends the progression there); BARS: how long each lasts */
+/* a track with no step: nothing in its sequence (MOOD's starters go only there) */
+static int track_no_steps(const track_t *t)
+{
+    uint32_t i;
+    for (i = 0; i < NSTEP; i++)
+        if (t->step[i].time != ST_REST && (t->step[i].n || t->step[i].hit))
+            return 0;
+    return 1;
+}
+/* the factory phrase named name, NPATTERNS: none */
+static uint32_t pat_named(const char *name)
+{
+    uint32_t k;
+    for (k = 0; k < NPATTERNS && !str_eq(PATTERNS[k].name, name); k++)
+        ;
+    return k;
+}
+/* MOOD's starter for an empty track: its sound's kind (category.c) picks the phrase: a kit the beat, a bass the
+ * 16th pulse, a pad the held triad, the rest the arp */
+static void prog_starter(track_t *t)
+{
+    uint32_t c = t->user ? CAT_LEAD : preset_cat(t->eng_req, t->preset), k;
+    k = pat_named(chord_kit(t) || c == CAT_DRUM ? "DRIVE BT" : c == CAT_BASS ? "DRIVE BS" : c == CAT_PAD ? "PAD BAR" : "ARP 16");
+    if (k < NPATTERNS)
+        pat_load(t, k);
+}
+static void prog_ui_apply(uint32_t slot)
+{
+    uint32_t i, n = prog_len(), f = 0, st = 0;
+    if (slot == 0u) {
+        prog_set_mood((uint32_t)prog_ui[0]);
+        if (song.prog_mood != MOOD_OWN) {
+            for (i = 0; i < NTRK; i++) {
+                track_t *t = &trk[i];
+                if (!chord_kit(t) && t->p[P_QUANT] != QN_PROG) {
+                    t->p[P_QUANT] = QN_PROG;
+                    f++;
+                }
+                if (track_no_steps(t) && !song.playing) {   /* (stopped: a load while playing is the user's) */
+                    prog_starter(t);
+                    st++;
+                }
+            }
+            song.prog_cur = 0;
+            if (st)
+                ui_message("STARTERS IN EMPTY TRACKS: PLAY");
+            else if (f)
+                ui_message("TRACKS FOLLOW: QNT PROG");
+        }
+    } else if (slot == 1u) {
+        song.prog_cur = (uint8_t)clamp(prog_ui[1] - 1, 0, (int32_t)(n < PROG_N ? n : PROG_N - 1u));   /* (one past: add) */
+    } else if (slot == 2u) {
+        uint32_t c = song.prog_cur < PROG_N ? song.prog_cur : 0u;
+        if (!c && prog_ui[2] == PROG_END)
+            return;                                      /* (the first chord stays a chord) */
+        song.prog[c] = (uint8_t)prog_ui[2];
+        song.prog_mood = MOOD_OWN;
+    } else {
+        song.prog_bars = (uint8_t)prog_ui[3];
+    }
+    ui.force = 1;
+}
+
 static void edit_param(uint32_t slot, int32_t steps)
 {
     int16_t *vp;
@@ -1073,6 +1139,10 @@ static void edit_param(uint32_t slot, int32_t steps)
     if (vp == &TSEL->p[P_ATSNS] && !*vp && v)             /* AFTERTOUCH on (1.8): the engine's routing, if none */
         at_turn_on(TSEL);
     *vp = (int16_t)v;
+    if (pg->graph == GR_PROG) {
+        prog_ui_apply(slot);
+        return;
+    }
     if (pg->scope != SC_GLOBAL) {
         motion_capture(TSEL, (uint32_t)(vp - TSEL->p), *vp);
         ml_knob(TSEL, (uint32_t)(vp - TSEL->p));        /* (MIDI LEARN: picked) */

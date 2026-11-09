@@ -1230,12 +1230,35 @@ static void pat_label(uint32_t n, char *tag, char *name)   /* tag: 4 bytes ("01"
     }
 }
 
+/* NEON: a factory pattern's chord steps (flag P_CHORD, engines.c): the step's note and the third and the fifth above it
+ * in the track's scale (as PROG moves in: CHR its minor), so a pad phrase plays the triad of its key, and with QNT PROG
+ * every chord of the progression. A kit gets the note alone */
+static void pat_chords(track_t *t, const uint8_t *flags)
+{
+    uint32_t i, mask = prog_mask(t);
+    int32_t r = t->p[P_QUANT] == QN_PROG ? 0 : t->p[P_ROOT];   /* (PROG: written in C, ROOT moves it as it plays) */
+    if (chord_kit(t))
+        return;
+    for (i = 0; i < 16u && i < NSTEP; i++) {
+        step_t *s = &t->step[i];
+        int32_t b;
+        if (!(flags[i] & P_CHORD) || !s->n)
+            continue;
+        b = snap_mask(s->note[0], mask, r);
+        s->note[0] = (uint8_t)clamp(b, 0, 127);
+        s->note[1] = (uint8_t)clamp(deg_move(b, 2, mask, r), 0, 127);
+        s->note[2] = (uint8_t)clamp(deg_move(b, 4, mask, r), 0, 127);
+        s->n = 3;
+    }
+}
+
 static void pat_load(track_t *t, uint32_t n)
 {
     load_begin(t, UNDO_PAT);
-    if (n < NPATTERNS)
+    if (n < NPATTERNS) {
         load_pat16(t, PATTERNS[n].note, PATTERNS[n].flags);
-    else
+        pat_chords(t, PATTERNS[n].flags);
+    } else
         up_pat_load(t, up_pat_nth(n - NPATTERNS));
     pat_sig[trk_index(t)] = steps_sig(t);
     pat_last[trk_index(t)] = (uint8_t)(n + 1u);

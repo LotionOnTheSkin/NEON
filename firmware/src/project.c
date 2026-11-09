@@ -128,6 +128,7 @@ typedef struct {
     motion_store_t motion;
     uint8_t fm6[NTRK][FM6_PACKED];             /* each track's FM6 patch, packed (eng_fm6.c) */
     uint8_t mch[NTRK];                         /* 1.5.5: MIDI IN TRACK's channels, as song.mch (PROJ_MIDI_OFF) */
+    uint8_t prog[4];                           /* NEON HARMONY: the progression, packed (PROJ_PROG_OFF, proj_prog_*) */
     char name[PROJ_NAME_LEN];                  /* the project's name: upper-case ASCII 32..126, 0-padded; "" = none */
     uint32_t sum;
 } project_t;
@@ -165,6 +166,31 @@ _Static_assert(sizeof(project_v5_t) == 3352u && sizeof(project_v6_t) == 3388u, "
  * channels make, else CH1-4), which is all a firmware before 1.5.5 reads (these bytes it never did): a TRACK project plays
  * there as that block. Every project before has them 0: channels 1..4, MIDI IN as its G_ROUTE says */
 #define PROJ_MIDI_OFF (PROJ_FM6_OFF - 3u)
+/* NEON HARMONY: the progression, 4 bytes in the place of the two inert globals G_DRLVL and G_DRREV (bytes 8 + 2 x 25:
+ * the tail has no room left; nothing reads those of a FUN10, their range is 0..0, every FUN10 before holds 0 there).
+ * Bits 3i..3i+2: chord i's degree (0..6, 7 the end); byte 3: bit 7 set (a progression is
+ * stored), bits 4..6 the MOOD, bits 0..1 BARS. Every project before has 0 there: no progression, the power-on one
+ * (prog.c, DRIVE); Felucca never reads these bytes, so the project loads there as it is, without it */
+#define PROJ_PROG_OFF (8u + 2u * G_DRLVL)
+_Static_assert(G_DRREV == G_DRLVL + 1u, "the progression's 4 bytes: G_DRLVL and G_DRREV");
+static void proj_prog_from_song(uint8_t *b)
+{
+    uint32_t i, v = 0;
+    for (i = 0; i < 8u; i++)
+        v |= (uint32_t)(song.prog[i] < 7u ? song.prog[i] : 7u) << (3u * i);
+    b[0] = (uint8_t)v; b[1] = (uint8_t)(v >> 8); b[2] = (uint8_t)(v >> 16);
+    b[3] = (uint8_t)(0x80u | (song.prog_mood & 7u) << 4 | (song.prog_bars < 3u ? song.prog_bars : 0u));
+}
+static void proj_prog_to_song(const uint8_t *b)
+{
+    static const uint8_t DEF[8] = {0, 5, 2, 6, 7, 7, 7, 7};   /* (prog.c PROG_MOOD[PM_DRIVE]) */
+    uint32_t i, v = b[0] | (uint32_t)b[1] << 8 | (uint32_t)b[2] << 16;
+    for (i = 0; i < 8u; i++)
+        song.prog[i] = b[3] & 0x80u ? (uint8_t)((v >> (3u * i)) & 7u) : DEF[i];
+    song.prog_mood = b[3] & 0x80u ? (uint8_t)(((b[3] >> 4) & 7u) < 7u ? (b[3] >> 4) & 7u : 0u) : 1u;
+    song.prog_bars = b[3] & 0x80u ? (uint8_t)((b[3] & 3u) < 3u ? b[3] & 3u : 0u) : 0u;
+    song.prog_cur = 0;
+}
 typedef union { uint32_t align; uint8_t raw[PROJ_STORE_SIZE]; } project_store_t;
 _Static_assert(G_COUNT == 27u, "FUN7 globals retain original IDs");
 _Static_assert(sizeof(project_store_t) == 3840u && PROJ_STORE_V7 == sizeof(project_v6_t), "FUN10 / FUN7 sizes");
@@ -651,6 +677,7 @@ static int proj_pack(project_store_t *out, const project_t *q)
     memcpy(b + pos, &q->chain, sizeof q->chain); pos += sizeof q->chain;
     memcpy(b + pos, &q->motion, sizeof q->motion);
     proj_midi_pack(b, q);
+    memcpy(b + PROJ_PROG_OFF, q->prog, sizeof q->prog);
     memcpy(b + PROJ_FM6_OFF, q->fm6, sizeof q->fm6);
     {   /* the name (0-padded; stops at the first 0) */
         char n[PROJ_NAME_LEN + 1u];
@@ -710,6 +737,10 @@ static int proj_unpack(project_t *q, const uint8_t *b, uint32_t st)
         return 0;
     memset(q, 0, sizeof *q); q->magic = PROJ_MAGIC; q->size = sizeof *q;
     memcpy(q->g, b + 8, sizeof q->g); q->sel = b[62]; q->parts = b[63]; q->phys = b[64];
+    if (v10) {                                          /* NEON HARMONY: the progression, out of the inert globals */
+        memcpy(q->prog, b + PROJ_PROG_OFF, sizeof q->prog);
+        q->g[G_DRLVL] = q->g[G_DRREV] = 0;
+    }
     if (v7 && (q->g[G_RTYPE] < 0 || q->g[G_RTYPE] > 1))   /* a FUN7 may still hold the old drum channel there */
         proj_rtype_room(q->g);
     for (t = 0; t < NTRK; t++) {
@@ -877,6 +908,7 @@ static void project_capture(project_t *p)
     }
     p->motion = motion;
     memcpy(p->mch, song.mch, sizeof p->mch);
+    proj_prog_from_song(p->prog);
     motion_unguard(f);
     memcpy(p->name, proj_name, str_len(proj_name));
     p->sum = proj_sum(p);
@@ -1080,6 +1112,7 @@ static int project_restore_runtime(const project_t *input)
             song.g[i] = (int16_t)clamp(p->g[i], GP[i].min, GP[i].max);
     for (k = 0; k < NTRK; k++)                          /* MIDI IN TRACK's channels (1.5.5; 0, channels 1..4, before) */
         song.mch[k] = (uint8_t)(p->mch[k] < MCH_N ? p->mch[k] : 0u);
+    proj_prog_to_song(p->prog);                         /* NEON HARMONY */
     midi_route = MIDI_ROUTE_AGAIN;                      /* (events_block: what the channels no longer hear let go) */
     for (k = 0; k < NTRK; k++) {
         track_t *t = &trk[k];
@@ -1362,6 +1395,8 @@ static uint32_t autosave_sig(void)
         if (i != G_SLOT && i != G_NAME && i != G_LOAD && i != G_SAVE)
             h = as_mix(h, &song.g[i], sizeof song.g[i]);
     h = as_mix(h, song.mch, sizeof song.mch);           /* (1.5.5: MIDI IN TRACK's channels, the project's) */
+    h = as_mix(h, song.prog, sizeof song.prog);         /* (NEON: the progression) */
+    h = as_mix(h, &song.prog_bars, 2u);
     h = as_mix(h, &motion, sizeof motion);
     h = as_mix(h, &chain_config, sizeof chain_config);
     return as_mix(h, proj_name, sizeof proj_name);

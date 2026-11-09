@@ -120,7 +120,9 @@ static int32_t scale_snap(const track_t *t, int32_t n)
     return n;
 }
 
-enum { QN_OFF, QN_SNAP, QN_WHITE, QN_SEQ, QN_SEQT };   /* P_QUANT (SEQ+T, 1.5.6 #218: appended; older firmware loads SEQ) */
+enum { QN_OFF, QN_SNAP, QN_WHITE, QN_SEQ, QN_SEQT, QN_PROG };   /* P_QUANT (SEQ+T, 1.5.6 #218: appended; older firmware loads SEQ;
+                                                         * NEON's PROG: SEQ+T, and the notes follow the progression) */
+#include "prog.c"
 
 /* the engine's own key map (DRUM's GM map, slices) for key k, -1 none */
 static int32_t kb_engine(const track_t *t, uint32_t k)
@@ -135,6 +137,8 @@ static uint32_t kb_pitch(const track_t *t, uint32_t k, int32_t oct)
 {
     static const int8_t DEGREE[12] = {0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6};
     int32_t n = 53 + (int32_t)k;
+    if (t->p[P_QUANT] == QN_PROG)                       /* NEON PROG: the key as the chord playing has it */
+        return (uint32_t)clamp(prog_follow(t, n + 12 * oct + t->p[P_TRANS]), 0, 127);
     if (t->p[P_QUANT] == QN_SNAP || t->p[P_QUANT] >= QN_SEQ)   /* SNAP (and SEQ, SEQ+T): every key, rounded down */
         return (uint32_t)clamp(scale_snap(t, n + 12 * oct + t->p[P_TRANS]), 0, 127);
     if (t->p[P_QUANT] == QN_WHITE) {                    /* WHITE: white keys walk the scale, black keys are silent */
@@ -911,6 +915,7 @@ static void seq_start(void)
     }
     song.tick = 0;
     beat_pos = 0; beat_n = 0;                      /* the ARP LED's beat from the top too */
+    prog_bar = 0;                                   /* (and the progression) */
     clk_pos = CLK_START;                           /* the metronome's first beat with step 0 */
     song.playing = 1;
     slicer_start();                                /* slicer.c: its step 0 with the sequencer's */
@@ -1003,7 +1008,8 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
      * the notes that sound: their note-offs match */
     const engine_t *e = ENGINES[eng_idx(t->eng_req)];
     uint32_t qseq = t->p[P_QUANT] >= QN_SEQ && !(e->keys && e->keys(t, 0) >= 0);
-    int32_t qtrn = qseq && t->p[P_QUANT] == QN_SEQT ? t->p[P_TRANS] : 0;
+    int32_t qtrn = qseq && t->p[P_QUANT] >= QN_SEQT ? t->p[P_TRANS] : 0;
+    uint32_t qprog = qseq && t->p[P_QUANT] == QN_PROG;
     if (!(skip & SEQ_REP)) {
         t->rat_left = 0;
         if ((skip & SEQ_MISS) || (!(skip & SEQ_ROLLED) && seq_miss(t, s, idx))) {
@@ -1030,7 +1036,8 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
     for (i = 0; i < s->n && i < 4u; i++) {
         uint32_t x = s->note[i];
         if (qseq) {                                 /* QNT SEQ: onto the scale now; two notes snapping */
-            x = (uint32_t)clamp(scale_snap(t, (int32_t)x + qtrn), 0, 127);   /* together play once */
+            x = (uint32_t)clamp(qprog ? prog_follow(t, (int32_t)x + qtrn)    /* together play once */
+                                      : scale_snap(t, (int32_t)x + qtrn), 0, 127);
             for (j = 0; j < m && nn[j] != x; j++)
                 ;
             if (j < m)
@@ -1479,6 +1486,7 @@ static void events_block(uint32_t n)
     if (aud_req)
         seq_audition();                               /* (STEP PREVIEW: a step sounds, stopped) */
     chain_tick(clock_mode && chain.running ? midi_seq_preview(&trk[chain.clk], seq_n) : seq_n);
+    prog_block(song.playing && beat_n == 3u && beat_pos + n >= beat_samples());   /* the chord of these steps */
     for (i = 0; i < NTRK; i++)
         seq_tick(&trk[i], seq_n);
     if (cin_flush)
@@ -1494,6 +1502,8 @@ static void events_block(uint32_t n)
         beat_pos -= beat_samples();
         beat_pos = beat_pos < beat_samples() ? beat_pos : 0u;
         beat_n = (beat_n + 1u) & 3u;
+        if (!beat_n && song.playing)
+            prog_bar++;                               /* NEON HARMONY: the bars since PLAY */
     }
     if (song.playing)
         song.tick++;

@@ -21,6 +21,17 @@ analog drift (MOVE). Everything else is Felucca as it is upstream.
 - **SUNSET DRIVE:** tap HOME from HOME to step HOME > MIXER > CLOCK > **DRIVE**: a visualizer where the grid rolls
   toward you one line a beat (it follows the tempo and stops when you stop), the sun swells with the loudest track,
   the horizon glows with the bass, and a light per track shines in the sky.
+- **HARMONY: one progression drives the song.** SCL > CHORD > **PROG**: pick a MOOD (DRIVE i-VI-III-VII, DAWN,
+  NIGHT, MYST, HEART, RISE) and every melodic track follows it (QNT **PROG**): its steps, keys and arp are written in C
+  and move with each chord, by scale steps, the shorter way, so a bass, a pad and an arp written once play the whole
+  progression. ROOT is the key. SLOT / CHORD edit the eight chords (OWN), BARS sets 1, 2 or 4 bars a chord; stopped,
+  the keys play SLOT's chord. A MOOD on a new song drops starter phrases into the empty tracks (a 16th bass, a held
+  triad, a 16th arp, a beat): pick a mood, press PLAY. The progression is saved with the project.
+- **PUMP:** the SLICER's fourth mode: the track ducks on every beat (DEPTH) and swells back (PAT: how slowly): the
+  sidechain pump, in time at any tempo.
+- **Stereo chorus:** the chorus bus is a Juno's now: two taps swept against each other, one left, one right.
+- **Phrases:** SAVE > PHRASES adds DRIVE BS, PULSE 8, PAD BAR, STABS, ARP 16, LEAD 80, DRIVE BT (PAD BAR and STABS
+  load triads in the track's scale).
 - **The engine:** `firmware/src/eng_neon.c` (MIT). WAVE (SUPER / PWM / SUB / JUNO), SPRD, BLND, MOVE, CUT, RES, WARM,
   KTR. JUNO is one Juno-60 DCO: pulse with LFO PWM, saw, a locked sub; its knobs read SUB, SAW, PWM and RATE.
 - **Status:** experimental. It passes Felucca's host test suite; it has not yet been played on a real FM-1. Its CPU

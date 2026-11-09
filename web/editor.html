@@ -1672,12 +1672,12 @@ function makeMockDevice(opt = {}) {
     D("PIT", F.BIPCT, -64, 63, 0), D("FLT", F.BIPCT, -64, 63, 0), D("SHP", F.BIPCT, -64, 63, 0), D("AMP", F.PCT, 0, 127, 0),
     E("MODE", ["OFF", "UP", "DN", "UPDN", "RND", "ORD", "REPEAT", "DNUP", "UP+8", "CONV", "DIVG", "PINKY", "THUMB", "WALK", "CHORD"], 0), E("RATE", NDIV, 2), D("OCT", F.INT, 1, 4, 1), D("GATE", F.PCT, 1, 127, 64),
     D("SWG", F.PCT, 0, 100, 0), D("PROB", F.PCT, 0, 127, 127), E("HOLD", NONOFF, 0), E("ORD", ["NOTE", "PLAY"], 0),
-    D("ROOT", F.NOTE, 0, 11, 0), E("SCL", ["CHR", "MAJ", "MIN", "DOR", "MIX", "PEN", "MPEN", "HARM", "PHRY", "LYD", "LOC", "MEL", "BLUES", "WHOLE", "DIMHW", "DIMWH"], 0), E("QNT", ["OFF", "SNAP", "WHITE", "SEQ", "SEQ+T"], 0), D("TRN", F.SEMI, -24, 24, 0),
+    D("ROOT", F.NOTE, 0, 11, 0), E("SCL", ["CHR", "MAJ", "MIN", "DOR", "MIX", "PEN", "MPEN", "HARM", "PHRY", "LYD", "LOC", "MEL", "BLUES", "WHOLE", "DIMHW", "DIMWH"], 0), E("QNT", ["OFF", "SNAP", "WHITE", "SEQ", "SEQ+T", "PROG"], 0), D("TRN", F.SEMI, -24, 24, 0),
     D("LEN", F.STEPS, 1, 64, 16), E("DIV", NDIV, 2), D("SWG", F.PCT, 0, 100, 0), D("GATE", F.PCT, 1, 127, 64),
     D("DST", F.PCT, 0, 127, 0), D("CHO", F.PCT, 0, 127, 0), D("DLY", F.PCT, 0, 127, 0), D("REV", F.PCT, 0, 127, 0),
     E("VCE", ["POLY", "MONO", "LEG", "UNI"], 0), D("GLD", F.TIME, 0, 127, 0), D("PAN", F.BIPCT, -64, 63, 0), E("MUTE", NONOFF, 0),
     E("GLMOD", ["RATE", "TIME"], 0), E("PRIO", ["LAST", "LOW", "HIGH"], 0), E("ALLOC", ["ROT", "REUSE"], 0), D("DTUNE", F.INT, 0, 127, 40),
-    E("SLCR", ["OFF", "GATE", "STUT"], 0), D("PAT", F.INT, 1, 16, 1), E("RATE", ["1/8", "1/16", "1/32", "8T", "16T", "32T"], 1), D("DEPTH", F.PCT, 0, 127, 127),
+    E("SLCR", ["OFF", "GATE", "STUT", "PUMP"], 0), D("PAT", F.INT, 1, 16, 1), E("RATE", ["1/8", "1/16", "1/32", "8T", "16T", "32T"], 1), D("DEPTH", F.PCT, 0, 127, 127),
     ...[1, 2, 3, 4].flatMap((k) => [E("SRC" + k, MSRC, 0), E("DST" + k, MDST, 0), D("AMT" + k, F.BIPCT, -64, 63, 0)]),   /* the matrix */
   ];
   const GP = [
@@ -1714,7 +1714,7 @@ function makeMockDevice(opt = {}) {
         D("DTN", F.INT, 0, 127, 0, null, "ct"), E("LINE", ["MIX", "RING"], 0), D("SUB", F.PCT, 0, 127, 0), D("FOLD", F.PCT, 0, 127, 0)],
       presets: [P("CZ BRASS", [0, 0, 36, 96, 10, 0, 20, 0], [20, 74, 92, 46], 0, 6), P("CZ BASS", [1, 0, 40, 80, 0, 0, 60, 0], [0, 62, 40, 28], 1, 2),
         P("CZ STRINGS", [0, 4, 46, 30, 14, 0, 0, 0], [60, 90, 112, 88], 0, 5), P("RESO SWEEP", [5, 0, 70, 100, 0, 0, 0, 0], [0, 72, 40, 60], 0, 1),
-        P("CRYSTAL", [6, 0, 84, 60, 6, 0, 0, 0], [0, 96, 0, 95], 0, 7), P("CZ SOLO", [4, 7, 64, 50, 8, 0, 0, 30], [6, 80, 95, 55], 1, 4)] },
+        P("CRYSTAL", [6, 0, 84, 60, 6, 0, 0, 0], [0, 96, 0, 95], 0, 7), P("CZ SOLO", [4, 7, 64, 50, 8, 0, 0, 0], [6, 80, 95, 55], 1, 4)] },
     { name: "LOFI", titles: ["CHIP", "MOTN"], edit: [E("CHIP", ["4BIT", "4B/2", "8BIT", "1BIT", "STEP"], 0), E("WAVE", ["PLS", "TRI", "SAW", "NOIS", "WRAM"], 0), D("DUTY", F.INT, 0, 127, 64),
         D("CRSH", F.PCT, 0, 127, 0), D("SWP", F.PCT, 0, 127, 0), D("VIB", F.PCT, 0, 127, 0), E("ARP", ["OFF", "OCT", "MAJ", "MIN"], 0), D("TONE", F.PCT, 0, 127, 127)],
       presets: [P("CHIP LEAD", [0, 0, 32, 0, 0, 24, 0, 127], [0, 60, 90, 30], 1, 4), P("CHIP BASS", [1, 1, 0, 0, 0, 0, 0, 90], [0, 50, 70, 20], 1, 2),
@@ -1758,7 +1758,7 @@ function makeMockDevice(opt = {}) {
         E("KICK", ["PUNCH", "ROUND"], 0), D("DRV", F.PCT, 0, 127, 0)],
       presets: [P("DRUM KIT", [0, 64, 70, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0, 12), P("GATED 85", [8, 64, 72, 50, 80, 100, 0, 10], [0, 100, 127, 100], 0, 12),
         P("808 NIGHT", [4, 58, 60, 90, 64, 100, 1, 0], [0, 100, 127, 100], 0, 12), P("DRIVE KIT", [10, 64, 70, 56, 90, 100, 0, 40], [0, 100, 127, 100], 0, 12),
-        P("NEON KIT", [9, 64, 78, 70, 80, 100, 0, 20], [0, 100, 127, 100], 0, 12), P("PERC 84", [11, 64, 70, 60, 70, 100, 0, 0], [0, 100, 127, 100], 0, 12)] },
+        P("NEON KIT", [9, 64, 78, 62, 80, 100, 0, 20], [0, 100, 127, 100], 0, 12), P("PERC 84", [11, 64, 70, 60, 70, 100, 0, 0], [0, 100, 127, 100], 0, 12)] },
     { name: "NOISE", titles: ["SRC", "MOVE"], edit: [E("MODE", ["ANLG", "DUST", "LFSR", "META"], 0), D("COLR", F.PCT, 0, 127, 64),
         D("FREQ", F.CUTOFF, 0, 127, 80), D("RES", F.PCT, 0, 127, 30), D("TRK", F.PCT, 0, 127, 64), D("DENS", F.PCT, 0, 127, 0),
         D("DRFT", F.PCT, 0, 127, 0), D("CRSH", F.PCT, 0, 127, 0)],
@@ -1812,6 +1812,13 @@ function makeMockDevice(opt = {}) {
     [[60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],
     [[36, 42, 42, 42, 38, 42, 36, 42, 36, 42, 42, 36, 38, 42, 46, 42], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 12 BEAT (DRUM) */
     [[48, 51, 55, 60, 63, 67, 72, 75, 48, 51, 55, 60, 63, 67, 72, 75], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]],   /* 13 ARP */
+    [[36, 36, 48, 36, 36, 36, 48, 36, 36, 36, 48, 36, 36, 36, 48, 36], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 14 DRIVE BS (NEON) */
+    [[36, 0, 36, 0, 36, 0, 36, 0, 36, 0, 36, 0, 36, 0, 36, 0], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 15 PULSE 8 (NEON) */
+    [[60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [128, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_]],   /* 16 PAD BAR (128: a triad, ui.c pat_chords) (NEON) */
+    [[60, 0, 0, 60, 0, 0, 60, 0, 0, 0, 60, 0, 0, 60, 0, 0], [129, 0, 0, 128, 0, 0, 129, 0, 0, 0, 128, 0, 0, 128, 0, 0]],   /* 17 STABS (NEON) */
+    [[60, 63, 67, 72, 75, 72, 67, 63, 60, 63, 67, 72, 75, 72, 67, 63], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 18 ARP 16 (NEON) */
+    [[72, 0, 0, 70, 0, 0, 67, 0, 63, 0, 65, 0, 67, 0, 0, 0], [1, T_, T_, 0, T_, T_, 0, T_, 1, T_, 0, T_, 1, T_, T_, T_]],   /* 19 LEAD 80 (NEON) */
+    [[36, 0, 42, 0, 38, 0, 42, 36, 36, 0, 42, 0, 38, 0, 42, 46], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 20 DRIVE BT (DRUM) (NEON) */
   ];
   for (let op = 0; op < 4; op++) TP.push(D("ATK", F.TIME, 0, 127, 0), D("DEC", F.TIME, 0, 127, 0), D("SUS", F.PCT, 0, 127, 127), D("REL", F.TIME, 0, 127, 0), D("LVL", F.PCT, 0, 127, 127));
   TP.push(E("CHRD", ["OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW"], 0),   /* the chord keys 81, 82 */

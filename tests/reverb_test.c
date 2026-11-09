@@ -82,12 +82,18 @@ static void ref_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_
         int32_t y = 0, x, r, a;
         ref_cho[rf.cho_w & (CHO_LEN - 1u)] = (int16_t)clamp(cho_in[i] >> 1, -32768, 32767);
         rf.cho_ph += cinc;
-        r = (400 << 8) + ((osc_sine(rf.cho_ph) + 32768) * cdepth >> 8);
-        {
-            uint32_t ri = (uint32_t)r >> 8;
-            int32_t f = r & 255, c0 = ref_cho[(rf.cho_w - ri) & (CHO_LEN - 1u)];
-            int32_t c1 = ref_cho[(rf.cho_w - ri - 1u) & (CHO_LEN - 1u)];
-            y += (c0 + (((c1 - c0) * f) >> 8)) << 1;
+        {                                            /* (NEON: two taps, the sweeps opposite; the bus their sum) */
+            int32_t s0 = osc_sine(rf.cho_ph), q;
+            for (q = 0; q < 2; q++) {
+                uint32_t ri;
+                int32_t f, c0, c1;
+                r = (400 << 8) + ((q ? 32768 - s0 : s0 + 32768) * cdepth >> 8);
+                ri = (uint32_t)r >> 8;
+                f = r & 255;
+                c0 = ref_cho[(rf.cho_w - ri) & (CHO_LEN - 1u)];
+                c1 = ref_cho[(rf.cho_w - ri - 1u) & (CHO_LEN - 1u)];
+                y += c0 + (((c1 - c0) * f) >> 8);
+            }
         }
         rf.cho_w++;
         x = ref_dly[(rf.dly_w - dl) & (DLY_LEN - 1u)];

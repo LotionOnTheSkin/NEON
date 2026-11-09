@@ -37,7 +37,7 @@ static const param_desc_t ESYNC_DESC[3] = {   /* ATK DEC REL with ENV SYNC on: t
 static uint32_t esync_idx(int32_t v) { return (uint32_t)(v & 127) * ESYNC_N >> 7; }   /* (param_format's split) */
 /* seq.c kb_map; 1 = SNAP (stored projects: the former ON); 3 = SEQ: SNAP, and the sequencer's notes snap too as
  * they play (seq.c seq_step; the steps keep what was written). Append-only: older projects hold 0..2 */
-static const char *const N_QUANT[] = {"OFF", "SNAP", "WHITE", "SEQ", "SEQ+T"};
+static const char *const N_QUANT[] = {"OFF", "SNAP", "WHITE", "SEQ", "SEQ+T", "PROG"};   /* NEON: PROG (prog.c) */
 /* chord keys (chord.c): OFF, the diatonic triad / seventh of the track's ROOT and SCALE on the key, fixed shapes */
 static const char *const N_CHRD[] = {"OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW"};
 static const char *const N_VOIC[] = {"CLOSE", "OPEN", "INV1", "INV2", "+OCT"};   /* VC_CLOSE .. VC_BASS */
@@ -55,7 +55,7 @@ static const char *const N_NOTE[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", 
 static const char *const N_DASH[] = {"--"};
 static const char *const N_RTYPE[] = {"ROOM", "SPRING", "HALL"};   /* G_RTYPE: the reverb bus's model (fx.c) */
 static const char *const N_GO[] = {"--", "GO"};
-static const char *const N_SLCR[] = {"OFF", "GATE", "STUT"};             /* SL_OFF .. SL_STUT (slicer.c) */
+static const char *const N_SLCR[] = {"OFF", "GATE", "STUT", "PUMP"};     /* SL_OFF .. SL_PUMP (slicer.c; PUMP: NEON) */
 static const char *const N_SLDIV[] = {"1/8", "1/16", "1/32", "8T", "16T", "32T"};   /* SL_DEN */
 /* the INSERT's types (1.5, fx.c IT_*; append-only: stored). Its three values A B C mean what the type says (ins_desc) */
 static const char *const N_ITYPE[] = {"OFF", "SOFT", "HARD", "FOLD", "FUZZ", "CRUSH", "PHASR", "FLANG", "CHOR"};
@@ -452,7 +452,7 @@ enum { FAM_HOME, FAM_ENV, FAM_LFO, FAM_FX, FAM_SCL, FAM_EDIT, FAM_GLO, FAM_SAVE,
 enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK };   /* SC_TRK: the TRACKS page (ui_input.c tracks_edit) */
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_FX, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
        GR_SLCR, GR_MOD, GR_PATS, GR_SONG, GR_TOOLS, GR_CHORD, GR_SLICES, GR_EVENTS,
-       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS, GR_DRIVE };   /* (GR_DRIVE: NEON's SUNSET DRIVE, ui_graph.c draw_drive) */   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
+       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS, GR_DRIVE, GR_PROG };   /* (GR_PROG: NEON HARMONY, prog.c) */   /* (GR_DRIVE: NEON's SUNSET DRIVE, ui_graph.c draw_drive) */   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
 
 typedef struct {
     const char *title;
@@ -518,13 +518,40 @@ static const page_t PAGES[] = {
     /* NEON: HOME tapped on CLOCK, SUNSET DRIVE (ui_graph.c draw_drive): the visualizer in place of the cards and the
      * panel, header and footer kept; no knobs. Again HOME */
     {"DRIVE", FAM_TRK, SC_GLOBAL, GR_DRIVE, {0xFF, 0xFF, 0xFF, 0xFF}},
+    /* NEON HARMONY: SCL's third page, the project's progression (prog.c): MOOD SLOT CHORD BARS (page_desc: prog_ui) */
+    {"PROG", FAM_SCL, SC_GLOBAL, GR_PROG, {0xFF, 0xFF, 0xFF, 0xFF}},
 };
 #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
 static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */
 
+/* NEON HARMONY's page (PROG): its knobs show and turn copies of the song's progression (prog_ui, filled here from
+ * song; ui_input.c edit_param puts a turn back, prog_ui_apply) */
+static const char *const N_MOOD[] = {"OWN", "DRIVE", "DAWN", "NIGHT", "MYST", "HEART", "RISE"};
+static const char *const N_PBARS[] = {"1", "2", "4"};
+static char prog_nm[8][6];                       /* CHORD's names: the degrees as the scale has them (prog.c prog_names) */
+static const char *const N_PCHORD[8] = {prog_nm[0], prog_nm[1], prog_nm[2], prog_nm[3], prog_nm[4], prog_nm[5],
+                                        prog_nm[6], prog_nm[7]};
+static const param_desc_t PROG_DESC[4] = {
+    {"MOOD", F_ENUM, 0, 6, 1, N_MOOD, 0},
+    {"SLOT", F_INT, 1, 8, 1, 0, 0},
+    {"CHORD", F_ENUM, 0, 7, 0, N_PCHORD, 0},
+    {"BARS", F_ENUM, 0, 2, 0, N_PBARS, 0},
+};
+static int16_t prog_ui[4];
+static void prog_names(void);                    /* (prog.c) */
 static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **valp)
 {
     uint32_t id = pg->id[slot];
+    if (pg->graph == GR_PROG && slot < 4u) {
+        uint32_t cur = song.prog_cur < 8u ? song.prog_cur : 0u;
+        prog_names();
+        prog_ui[0] = song.prog_mood < 7u ? song.prog_mood : 0;
+        prog_ui[1] = (int16_t)(cur + 1u);
+        prog_ui[2] = song.prog[cur] < 8u ? song.prog[cur] : 7;
+        prog_ui[3] = song.prog_bars < 3u ? song.prog_bars : 0;
+        *valp = &prog_ui[slot];
+        return &PROG_DESC[slot];
+    }
     if (id == 0xFFu) {
         *valp = 0;
         return 0;

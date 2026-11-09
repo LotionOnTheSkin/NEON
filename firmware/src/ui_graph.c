@@ -434,6 +434,47 @@ static void graph_chord(const track_t *t, uint16_t c)
                  !on ? T_RAISE : note % 12u == (uint32_t)r % 12u ? T_ACCENT : c, T_SURF);
     }
 }
+/* NEON HARMONY (PROG): the progression as eight chord cards in two rows, its key and how long a chord lasts above them;
+ * each card its degree (as the selected track's scale has it) and the chord's name; the chord playing (stopped: the
+ * one the keys play, SLOT's) filled in the THEME colour, SLOT's card ringed in ACCENT; the card after the last a "+" (SLOT there and CHORD: one more chord) */
+static void graph_prog(const track_t *t, uint16_t c)
+{
+    uint32_t n = prog_len(), i, sc = (uint32_t)clamp(t->p[P_SCALE], 0, (int32_t)(sizeof N_SCALE / sizeof N_SCALE[0]) - 1);
+    static const char *const FLAT[12] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+    uint32_t play = !n ? 0xFFu : song.playing ? prog_at(prog_bar) : song.prog_cur, cur = song.prog_cur;
+    char b[16], r[8];
+    str_cpy(b, N_NOTE[(uint32_t)t->p[P_ROOT] % 12u], sizeof b);
+    str_cpy(b + str_len(b), " ", sizeof b - str_len(b));
+    str_cpy(b + str_len(b), sc ? N_SCALE[sc] : "MIN", sizeof b - str_len(b));
+    cv_text_on(10, 4, &AF_S, b, T_TEXT, T_SURF);
+    str_cpy(b, N_PBARS[song.prog_bars < 3u ? song.prog_bars : 0u], sizeof b);
+    str_cpy(b + str_len(b), song.prog_bars ? " BARS EACH" : " BAR EACH", sizeof b - str_len(b));
+    cv_text_r(228, 4, &AF_S, b, T_MID, T_SURF);
+    for (i = 0; i < PROG_N; i++) {
+        int32_t x = 10 + (int32_t)(i % 4u) * 56, y = 24 + (int32_t)(i / 4u) * 44, w = 50, h = 38;
+        uint32_t d = song.prog[i], on = i == play;
+        uint16_t fill = on ? c : T_RAISE, ink = on ? T_INK : T_TEXT;
+        if (i > n)
+            continue;
+        if (i == cur)
+            cv_rrect(x - 2, y - 2, w + 4, h + 4, 7, T_ACCENT, T_SURF);
+        if (i == n) {
+            cv_rrect(x, y, w, h, 5, T_SURF, i == cur ? T_ACCENT : T_SURF);
+            cv_frame(x, y, w, h, T_DIM);
+            cv_text_in(x, y + 9, w, &AF_M, "+", T_DIM, T_SURF);
+            continue;
+        }
+        cv_rrect(x, y, w, h, 5, fill, i == cur ? T_ACCENT : T_SURF);
+        prog_roman(r, t, d);
+        cv_text_in(x, y + 2, w, &AF_M, r, ink, fill);
+        {
+            uint32_t q = prog_quality(t, d);
+            str_cpy(b, FLAT[prog_root_pc(t, d)], sizeof b);   /* (flats: Ab Eb Bb, as synthwave writes them) */
+            str_cpy(b + str_len(b), q == 1u ? "m" : q == 2u ? "dim" : q == 3u ? "+" : "", sizeof b - str_len(b));
+        }
+        cv_text_in(x, y + 22, w, &AF_S, b, on ? T_INK : T_MID, fill);
+    }
+}
 /* the four sends as faders under their cards: a RAISE slot, the THEME fill from the bottom, a cap */
 static void graph_fx(const track_t *t, uint16_t c)
 {
@@ -485,6 +526,20 @@ static void graph_slicer(const track_t *t, uint16_t c)
     uint32_t i, pat = sl_pattern(t), mode = (uint32_t)t->p[P_SLCR], cur = sl[t - trk].idx;
     int32_t open = 70 - t->p[P_SLDEPTH] * 70 / 127;      /* px a closed GATE step keeps */
     uint16_t col = mode == SL_OFF ? T_DIM : c;
+    if (mode == SL_PUMP) {                           /* NEON PUMP: four beats of the duck and its swell, the beat playing */
+        int32_t py = 0, x, d = t->p[P_SLDEPTH] * 70 / 127;
+        uint32_t rel = (4u + (uint32_t)clamp(t->p[P_SLPAT], 1, 16)) * 1000u / 12u;   /* the swell, 1/1000 beat */
+        for (x = 0; x < PANEL_W; x++) {
+            uint32_t ph = (uint32_t)x * 4000u / PANEL_W % 1000u;    /* 1/1000 into the beat */
+            int32_t g = ph < 8u ? d : d * 1000 / (1000 + (int32_t)(ph * ph * 9u / rel / rel * 100u)), y = 10 + g;
+            if (x)
+                cv_line_t(PANEL_X0 + x - 1, py, PANEL_X0 + x, y, c, 2);
+            py = y;
+        }
+        for (i = 0; i < 4u; i++)
+            cv_rect(PANEL_X0 + (int32_t)i * PANEL_W / 4, 84, PANEL_W / 4 - 4, 2, i == (uint32_t)sl[t - trk].idx % 4u ? T_ACCENT : T_RAISE);
+        return;
+    }
     for (i = 0; i < 16u; i++) {
         int32_t x = bar_x(i), y;
         if ((pat >> i) & 1u) {
@@ -1197,6 +1252,12 @@ static uint32_t graph_signature(void)
         h = (h ^ (uint32_t)t->p[i]) * 16777619u;
     h ^= (uint32_t)TSEL->preset * 7u + (uint32_t)song.g[G_SLOT] * 13u + TSEL->user * 257u + up_gen * 7919u + ui.uslot * 104729u +
          ui.ppick * 1299709u;
+    if (pg->graph == GR_PROG) {                      /* NEON HARMONY: the progression, its key, the chord playing */
+        h = fnv(h, song.prog, sizeof song.prog);
+        h ^= song.prog_bars * 7919u + song.prog_cur * 104729u + song.prog_mood * 3571u;
+        h ^= (uint32_t)t->p[P_ROOT] * 131u + (uint32_t)t->p[P_SCALE] * 1031u;
+        h ^= song.playing ? (prog_at(prog_bar) + 1u) * 1299709u : 0u;
+    }
     if (pg->graph == GR_CHORD) {                     /* the last chord played */
         h = (h ^ (chord_last[song.sel].root + 131u * chord_last[song.sel].mask)) * 16777619u;
         for (i = 0; i < CHORD_MAX; i++)
@@ -2411,6 +2472,10 @@ static void draw_graph(void)
         case GR_CHORD:
             cv_oy = 0;
             graph_chord(t, c);
+            break;
+        case GR_PROG:
+            cv_oy = 0;
+            graph_prog(t, c);
             break;
         case GR_FX:
             graph_fx(t, c);

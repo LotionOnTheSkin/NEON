@@ -6530,10 +6530,13 @@ static int test_seq_quant(void)
     ok = cur_page()->id[2] == P_QUANT && t->p[P_QUANT] == 0;
     turn(EN_K3, 10);
     param_format(&TP[P_QUANT], t->p[P_QUANT], val, &unit);
+    ok &= t->p[P_QUANT] == 5 && str_eq(val, "PROG");   /* (NEON: PROG after SEQ+T) */
+    turn(EN_K3, -1);
+    param_format(&TP[P_QUANT], t->p[P_QUANT], val, &unit);
     ok &= t->p[P_QUANT] == 4 && str_eq(val, "SEQ+T");
     turn(EN_K3, -1);
     param_format(&TP[P_QUANT], t->p[P_QUANT], val, &unit);
-    bad += check("SCL KNOB 3 QNT: OFF SNAP WHITE SEQ SEQ+T, SEQ+T last (1.5.6, #218; default OFF)",
+    bad += check("SCL KNOB 3 QNT: OFF SNAP WHITE SEQ SEQ+T PROG, PROG last (1.5.6, #218; NEON; default OFF)",
                  ok && t->p[P_QUANT] == 3 && str_eq(val, "SEQ"));
     t->p[P_SCALE] = 1;
     t->p[P_ROOT] = 0;
@@ -9966,6 +9969,90 @@ static int test_edit_quick_actions(void)
 
 /* 1.8 (the UX audit): steps edited by hand are undone themselves (not the load before them), PLAY stops from the menu
  * and a dialog, DELETE SECTION names the section, an external clock lost says so */
+/* NEON HARMONY (prog.c): a PROG track's steps follow the progression bar by bar (DRIVE in C minor: C Ab Eb Bb, the
+ * shorter way), its keys stopped follow the PROG page's SLOT, the progression is saved with the project, and MOOD on
+ * the page loads one and sets the melodic tracks (not the drums) to PROG */
+static int test_harmony(void)
+{
+    static const uint8_t WANT[4] = {48, 44, 51, 46};
+    int bad = 0, ok = 1;
+    track_t *t = &trk[0];
+    uint32_t i, b, n, bar;
+    ui_power_on();
+    prog_set_mood(MOOD_DRIVE);
+    song.prog_bars = 0;
+    t->p[P_SCALE] = 2;
+    t->p[P_ROOT] = 0;
+    t->p[P_QUANT] = QN_PROG;
+    for (i = 0; i < NSTEP; i++)
+        t->step[i] = (step_t){.note = {48}, .n = 1, .time = ST_NOTE};
+    t->p[P_SLEN] = 16;
+    t->seq_active = 1;
+    seq_start();
+    bar = 4u * beat_samples();
+    n = 0;
+    for (b = 0; b < 4u; b++) {
+        while (n * CTL < bar * b + 8u * CTL) {
+            events_block(CTL);
+            n++;
+        }
+        ok &= t->seq_n >= 1u && t->seq_notes[0] == WANT[b];
+        if (!(t->seq_n >= 1u && t->seq_notes[0] == WANT[b]))
+            printf("  bar %u: %u (want %u)\n", (unsigned)b, (unsigned)t->seq_notes[0], (unsigned)WANT[b]);
+    }
+    transport_req = 2;
+    events_block(CTL);
+    bad += check("HARMONY: a PROG track's C3 steps play C3 Ab2 Eb3 Bb2 over DRIVE's four bars (C minor)", ok);
+    song.prog_cur = 1;
+    prog_block(0);
+    bad += check("HARMONY: stopped, the keys follow SLOT's chord (C4 key: Ab3 on VI)", kb_map(t, 7) == 56u);
+    project_save(1);
+    prog_set_mood(MOOD_RISE);
+    song.prog_bars = 2;
+    project_load(1);
+    bad += check("HARMONY: the progression and BARS saved and loaded with the project",
+                 song.prog[0] == 0 && song.prog[1] == 5 && song.prog[2] == 2 && song.prog[3] == 6 && song.prog[4] == PROG_END &&
+                 song.prog_bars == 0 && song.prog_mood == MOOD_DRIVE);
+    ui_power_on();
+    prog_ui[0] = MOOD_NIGHT;
+    prog_ui_apply(0);
+    ok = song.prog[0] == 0 && song.prog[1] == 3 && song.prog[2] == 5 && song.prog[3] == 4 && song.prog_mood == MOOD_NIGHT;
+    for (i = 0; i < NTRK; i++)
+        ok &= chord_kit(&trk[i]) ? trk[i].p[P_QUANT] != QN_PROG : trk[i].p[P_QUANT] == QN_PROG;
+    bad += check("HARMONY: MOOD loads NIGHT and sets the melodic tracks (not the kit) to QNT PROG", ok);
+    prog_ui[2] = 6;
+    song.prog_cur = 1;
+    prog_ui_apply(2);
+    bad += check("HARMONY: CHORD edits SLOT's chord, the MOOD becomes OWN", song.prog[1] == 6 && song.prog_mood == MOOD_OWN);
+    {
+        uint32_t k;
+        for (k = 0; k < NPATTERNS && !str_eq(PATTERNS[k].name, "PAD BAR"); k++)
+            ;
+        trk[1].p[P_SCALE] = 2;
+        trk[1].p[P_ROOT] = 0;
+        pat_load(&trk[1], k);
+        bad += check("HARMONY: PHRASES' PAD BAR loads a C minor triad held the whole bar (C4 Eb4 G4, then TIEs)",
+                     k < NPATTERNS && trk[1].step[0].n == 3 && trk[1].step[0].note[0] == 60 && trk[1].step[0].note[1] == 63 &&
+                     trk[1].step[0].note[2] == 67 && trk[1].step[1].time == ST_TIE && trk[1].step[15].time == ST_TIE);
+        pat_load(&trk[3], k);                       /* (the kit: the note alone) */
+        bad += check("HARMONY: on a kit, a chord step loads its note alone", trk[3].step[0].n <= 1u);
+    }
+    ui_power_on();                                  /* MOOD on a new song: a starter in every empty track */
+    prog_ui[0] = MOOD_DRIVE;
+    prog_ui_apply(0);
+    bad += check("HARMONY: MOOD on empty tracks loads starters by their sound: bass DRIVE BS, pad PAD BAR, lead ARP 16, "
+                 "drums DRIVE BT",
+                 pat_last[0] == pat_named("DRIVE BS") + 1u && pat_last[1] == pat_named("PAD BAR") + 1u &&
+                 pat_last[2] == pat_named("ARP 16") + 1u && pat_last[3] == pat_named("DRIVE BT") + 1u &&
+                 trk[1].step[0].n == 3u);
+    trk[0].step[0].note[0] = 40;
+    prog_ui[0] = MOOD_NIGHT;
+    prog_ui_apply(0);
+    bad += check("HARMONY: MOOD again: tracks with steps keep them", trk[0].step[0].note[0] == 40);
+    ui_power_on();
+    return bad;
+}
+
 static int test_ux18(void)
 {
     int bad = 0, ok;
@@ -10136,6 +10223,7 @@ int main(void)
     bad += test_help();
     bad += test_no_flash();
     bad += test_ux18();
+    bad += test_harmony();
 #if FELUCCA_FM4
     bad += test_fm_charts();                        /* (DIGITAL's charts: built with FELUCCA_FM4=1 only) */
 #else

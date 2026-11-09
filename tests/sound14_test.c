@@ -479,7 +479,7 @@ static lr_t spread_run(int32_t sp, int32_t pan, uint32_t mode, const uint8_t *no
     track_t *t = &trk[0];
     lr_t a = {0};
     uint32_t k, i;
-    fresh(0, preset_by_name(0, "SOFT PAD"));
+    fresh(0, preset_by_name(0, "VAPOR PAD"));
     dry(t);
     song.master_q12 = 1024;                               /* below the limiter: the levels as mixed */
     t->p[P_VOICE] = (int16_t)mode;
@@ -579,7 +579,7 @@ static void test_spread_fx(void)
     double side_closed = 0, side_open = 0;
     char msg[160];
     /* SLICER GATE, pattern 1 (x.x.), DEPTH 100 %: in the closed steps L and R both near silent */
-    fresh(0, preset_by_name(0, "SOFT PAD"));
+    fresh(0, preset_by_name(0, "VAPOR PAD"));
     dry(t);
     t->p[P_ATK] = 0;
     t->p[P_SPRD] = 127;
@@ -613,7 +613,7 @@ static void test_spread_fx(void)
         double side[2][2] = {{0}}, all[2][2] = {{0}};
         uint32_t ph, r;
         for (r = 0; r < 2u; r++) {
-            fresh(0, preset_by_name(0, "SOFT PAD"));
+            fresh(0, preset_by_name(0, "VAPOR PAD"));
             dry(t);
             t->p[P_ATK] = 0;
             t->p[P_SPRD] = (int16_t)(r ? 127 : 0);
@@ -643,7 +643,7 @@ static void test_spread_fx(void)
         uint64_t hw[2];
         uint32_t r;
         for (r = 0; r < 2u; r++) {
-            fresh(0, preset_by_name(0, "SOFT PAD"));
+            fresh(0, preset_by_name(0, "VAPOR PAD"));
             dry(t);
             t->p[P_REV] = 100;
             t->p[P_SPRD] = (int16_t)(r ? 127 : 0);
@@ -682,7 +682,7 @@ static double cost(uint32_t nv, int32_t sp, int mx, uint32_t wave)
     track_t *t = &trk[0];
     uint32_t i, rep;
     double best = 1e30;
-    fresh(0, preset_by_name(0, "SOFT PAD"));
+    fresh(0, preset_by_name(0, "VAPOR PAD"));
     t->p[P_VOICE] = V_POLY;
     t->p[P_SUS] = 127;
     t->p[P_SPRD] = (int16_t)sp;
@@ -774,7 +774,7 @@ static int demos(const char *dir)
     FILE *f;
     track_t *t = &trk[0];
     /* S&H -> CUT: ANALOG ACID, a held note, the cutoff jumps once per LFO cycle (1/16 at 120 BPM: SYNC) */
-    fresh(0, preset_by_name(0, "SAW LEAD"));
+    fresh(0, preset_by_name(0, "MIAMI LEAD"));
     t->p[P_VOICE] = V_POLY;
     t->p[P_E4] = 50;
     t->p[P_E5] = 90;
@@ -789,7 +789,7 @@ static int demos(const char *dir)
         n++;
     }
     /* SLEW -> CUT, the same: the smooth random line */
-    fresh(0, preset_by_name(0, "SAW LEAD"));
+    fresh(0, preset_by_name(0, "MIAMI LEAD"));
     t->p[P_VOICE] = V_POLY;
     t->p[P_E4] = 50;
     t->p[P_E5] = 90;
@@ -805,7 +805,7 @@ static int demos(const char *dir)
     }
     /* LFO rate and depth modulated: LFO DEST PIT vibrato; ENV -> RATE speeds it up as the note decays .. no: MODW
      * rises over 4 s: MODW -> DEPTH opens the vibrato, MODW -> RATE speeds it up (a mod-wheel vibrato that quickens) */
-    fresh(0, preset_by_name(0, "SINE KEY"));
+    fresh(0, preset_by_name(0, "GLASS KEY"));
     t->p[P_VOICE] = V_POLY;
     t->p[P_SUS] = 127;
     t->p[P_LRATE] = 55;
@@ -824,7 +824,7 @@ static int demos(const char *dir)
         n++;
     }
     /* ANALOG SUB: a bass line, SUB at 0 .. 127 over it */
-    fresh(0, preset_by_name(0, "SQR BASS"));
+    fresh(0, preset_by_name(0, "PULSE BASS"));
     t->p[P_E0] = 6;
     t->p[P_E2] = 0;
     if ((f = demo_open(dir, "analog_sub", 6u * FS / CTL * CTL))) {
@@ -841,7 +841,7 @@ static int demos(const char *dir)
         n++;
     }
     /* ANALOG SYNC: the classic sweep, ENV DEST SHP on a lead, then DTN up by hand */
-    fresh(0, preset_by_name(0, "SAW LEAD"));
+    fresh(0, preset_by_name(0, "MIAMI LEAD"));
     t->p[P_E0] = 5;
     t->p[P_E1] = 0;
     t->p[P_E2] = 110;
@@ -868,7 +868,7 @@ static int demos(const char *dir)
         n++;
     }
     /* SPREAD on a pad: two chords at SPRD 0, then the same at SPRD 100 */
-    fresh(0, preset_by_name(0, "SOFT PAD"));
+    fresh(0, preset_by_name(0, "VAPOR PAD"));
     t->p[P_REV] = 50;
     if ((f = demo_open(dir, "spread_pad", 6u * (2u * FS / CTL) * CTL))) {
         uint32_t r;
@@ -886,7 +886,7 @@ static int demos(const char *dir)
         n++;
     }
     /* SPREAD on UNISON: a supersaw-ish lead, SPRD 0 then 127 */
-    fresh(0, preset_by_name(0, "SAW LEAD"));
+    fresh(0, preset_by_name(0, "MIAMI LEAD"));
     t->p[P_VOICE] = V_UNISON;
     t->p[P_DETUNE] = 60;
     if ((f = demo_open(dir, "spread_unison", 6u * FS / CTL * CTL))) {

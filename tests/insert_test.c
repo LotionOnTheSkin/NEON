@@ -112,7 +112,7 @@ static uint64_t phrase(void)
     fflush(stdout);
     if (!(pid = fork())) {
         track_t *t = &trk[0];
-        fresh(0, preset_by_name(0, "SOFT PAD"));
+        fresh(0, preset_by_name(0, "VAPOR PAD"));
         t->p[P_VOICE] = V_POLY;
         t->p[P_SPRD] = (int16_t)ph_sprd;
         if (ph_ty >= 0)
@@ -165,7 +165,7 @@ static void test_identity(void)
     ph_sprd = 0;
     {   /* review 1.5: TYPE OFF while the part is silent (its tail run out) leaves no INSERT state for the next note */
         track_t *t = &trk[0];
-        fresh(0, preset_by_name(0, "SOFT PAD"));
+        fresh(0, preset_by_name(0, "VAPOR PAD"));
         set_ins(t, IT_FLANGER, 64, 64, 64, 127);
         trk_note_on(t, 60, 100);
         mixb(FS / 4u / CTL);
@@ -333,7 +333,7 @@ static void test_motion(void)
     uint32_t i, k, step_s = 0;
     int ok_a = 1, ok_l = 1, seen_c = 0, seen_back = 0, seen_w = 0;
     static const uint8_t NOTE[1] = {48};
-    fresh(0, preset_by_name(0, "SAW LEAD"));
+    fresh(0, preset_by_name(0, "MIAMI LEAD"));
     set_ins(t, IT_FOLD, 90, 96, 96, 0);
     for (i = 0; i < 16u; i++)
         put_step(t, i, 1, NOTE, ST_NOTE, 0);
@@ -455,7 +455,7 @@ static double cost(int32_t ty, int32_t mix)
     track_t *t = &trk[0];
     uint32_t i, rep;
     double best = 1e30;
-    fresh(0, preset_by_name(0, "SOFT PAD"));
+    fresh(0, preset_by_name(0, "VAPOR PAD"));
     t->p[P_VOICE] = V_POLY;
     t->p[P_SUS] = 127;
     set_ins(t, ty, 100, 100, 100, mix);

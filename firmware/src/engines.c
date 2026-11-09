@@ -194,6 +194,7 @@ static uint32_t eng_step(uint32_t e, int32_t dir)
  * are (DRUM plays them as GM drums, SLICE as slices; SCL TRANS and OCT transpose): 0 = rest;
  * flags 1 = accent, 2 = slide, 4 = tie (holds the previous note). Names: at most 8 characters */
 #define T_ 4
+#define P_CHORD 0x80u                    /* NEON: the step's triad (ui.c pat_chords) */
 static const struct {
     const char *name;
     uint8_t note[16], flags[16];
@@ -228,6 +229,22 @@ static const struct {
      * now that the arpeggiator is the track's and a preset no longer switches it on */
     {"ARP", {48, 51, 55, 60, 63, 67, 72, 75, 48, 51, 55, 60, 63, 67, 72, 75},       /* 13 */
      {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}},
+    /* NEON: synthwave phrases in C minor, written on the tonic: with QNT PROG (SCL > PROG's MOOD) they play the whole
+     * progression. P_CHORD (ui.c pat_chords): the step's triad in the track's scale */
+    {"DRIVE BS", {36, 36, 48, 36, 36, 36, 48, 36, 36, 36, 48, 36, 36, 36, 48, 36},  /* 14 16th octave pulse */
+     {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}},
+    {"PULSE 8", {36, 0, 36, 0, 36, 0, 36, 0, 36, 0, 36, 0, 36, 0, 36, 0},           /* 15 8ths */
+     {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}},
+    {"PAD BAR", {60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},                 /* 16 a triad, the whole bar */
+     {P_CHORD, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_}},
+    {"STABS", {60, 0, 0, 60, 0, 0, 60, 0, 0, 0, 60, 0, 0, 60, 0, 0},              /* 17 3-3-2 chord stabs */
+     {P_CHORD | 1, 0, 0, P_CHORD, 0, 0, P_CHORD | 1, 0, 0, 0, P_CHORD, 0, 0, P_CHORD, 0, 0}},
+    {"ARP 16", {60, 63, 67, 72, 75, 72, 67, 63, 60, 63, 67, 72, 75, 72, 67, 63},   /* 18 up and down the chord */
+     {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}},
+    {"LEAD 80", {72, 0, 0, 70, 0, 0, 67, 0, 63, 0, 65, 0, 67, 0, 0, 0},            /* 19 a falling line, held */
+     {1, T_, T_, 0, T_, T_, 0, T_, 1, T_, 0, T_, 1, T_, T_, T_}},
+    {"DRIVE BT", {36, 0, 42, 0, 38, 0, 42, 36, 36, 0, 42, 0, 38, 0, 42, 46},       /* 20 kick, snare 2 and 4, hats */
+     {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}},
 };
 #undef T_
 #define NPATTERNS (sizeof PATTERNS / sizeof PATTERNS[0])

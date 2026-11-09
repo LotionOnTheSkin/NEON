@@ -718,6 +718,91 @@ static int trs_test(void)
     return !ok_parts + !ok_ch10 + !ok_sel + !ok_off + !ok_hang + !ok_rec;
 }
 
+/* NEONDEMO=out.wav: NEON HARMONY's starter song: the four tracks on the factory phrases DRIVE BS / PAD BAR / ARP 16 /
+ * DRIVE BT, every melodic one QNT PROG in MOOD (env, default DRIVE), the pad and bass pumping (SLICER PUMP), BPM 100,
+ * KEY (ROOT, default 9: A minor), BARS bars (8) and a tail */
+static void demo_pat(track_t *t, const char *name, int chords)
+{
+    uint32_t k, i, mask = prog_mask(t);
+    for (k = 0; k < NPATTERNS && strcmp(PATTERNS[k].name, name); k++)
+        ;
+    if (k >= NPATTERNS)
+        return;
+    for (i = 0; i < 16u; i++) {
+        uint8_t nt[3] = {PATTERNS[k].note[i], 0, 0}, fl = PATTERNS[k].flags[i];
+        uint32_t n = nt[0] ? 1u : 0u;
+        if (chords && n && (fl & 0x80u)) {
+            nt[1] = (uint8_t)deg_move(nt[0], 2, mask, 0);
+            nt[2] = (uint8_t)deg_move(nt[0], 4, mask, 0);
+            n = 3;
+        }
+        put_step(t, i, n, nt, (fl & 4u) ? ST_TIE : n ? ST_NOTE : ST_REST, fl & SF_ACCENT);
+    }
+    t->p[P_SLEN] = 16;
+}
+static int neon_demo(const char *path)
+{
+    static const char *const MOODS[] = {"OWN", "DRIVE", "DAWN", "NIGHT", "MYST", "HEART", "RISE"};
+    uint32_t bars = getenv("BARS") ? (uint32_t)atoi(getenv("BARS")) : 8u, m = MOOD_DRIVE, i, f, frames;
+    int32_t key = getenv("KEY") ? atoi(getenv("KEY")) : 9;
+    FILE *w = fopen(path, "wb");
+    if (!w)
+        return 1;
+    if (getenv("MOOD"))
+        for (i = 0; i < MOOD_COUNT; i++)
+            if (!strcmp(getenv("MOOD"), MOODS[i]))
+                m = i;
+    host_tracks_init();
+    song.g[G_BPM] = 100;
+    prog_set_mood(m);
+    song.prog_bars = 0;
+    host_preset(&trk[0], ENGI_NEON, 14);           /* VOLT BASS */
+    host_preset(&trk[1], ENGI_NEON, 12);           /* VOLT PAD */
+    host_preset(&trk[2], ENGI_NEON, 16);           /* JUNO ARP */
+    host_preset(&trk[3], ENGI_DRUM, 1);            /* GATED 85 */
+    for (i = 0; i < 3u; i++) {
+        trk[i].p[P_QUANT] = QN_PROG;
+        trk[i].p[P_SCALE] = 2;
+        trk[i].p[P_ROOT] = (int16_t)key;
+    }
+    demo_pat(&trk[0], "DRIVE BS", 0);
+    demo_pat(&trk[1], "PAD BAR", 1);
+    demo_pat(&trk[2], "ARP 16", 0);
+    for (i = 0; i < 16u; i++) {                    /* kick 4 on the floor, snare 2 and 4, 8th hats, an open one */
+        uint8_t n[4];
+        uint32_t k = 0;
+        if (i % 4u == 0u)
+            n[k++] = 36;
+        if (i == 4u || i == 12u)
+            n[k++] = 38;
+        if (i % 2u == 0u)
+            n[k++] = i == 14u ? 46 : 42;
+        put_step(&trk[3], i, k, n, k ? ST_NOTE : ST_REST, i % 4u == 0u ? SF_ACCENT : 0u);
+    }
+    trk[3].p[P_SLEN] = 16;
+    trk[0].p[P_SLCR] = SL_PUMP; trk[0].p[P_SLPAT] = 6; trk[0].p[P_SLDEPTH] = 50;
+    trk[1].p[P_SLCR] = SL_PUMP; trk[1].p[P_SLPAT] = 10; trk[1].p[P_SLDEPTH] = 95;
+    trk[2].p[P_LEVEL] = 92;
+    if (getenv("SOLO"))                            /* SOLO=n: track n alone */
+        for (i = 0; i < NPART; i++)
+            if (i + 1u != (uint32_t)atoi(getenv("SOLO")))
+                trk[i].p[P_LEVEL] = 0;
+    transport_req = 1;
+    frames = bars * 4u * (FS * 60u / 100u) + 2u * FS;
+    wav_hdr(w, frames);
+    for (f = 0; f < frames; f += CTL) {
+        int32_t o[2 * CTL];
+        if (f >= bars * 4u * (FS * 60u / 100u) && song.playing)
+            transport_req = 2;
+        mix_block(o, CTL);
+        for (i = 0; i < CTL; i++)
+            wav_put(w, o[2 * i], o[2 * i + 1]);
+    }
+    fclose(w);
+    printf("neon demo: %s, %s in %s minor, %u bars at 100 BPM\n", path, MOODS[m], N_NOTE[key % 12], (unsigned)bars);
+    return 0;
+}
+
 static int tracks_test(const char *dir)
 {
     static const char *const SOLO[5] = {"tracks_demo.wav", "t1_bass.wav", "t2_pad.wav", "t3_lead.wav", "t4_drums.wav"};
@@ -874,6 +959,19 @@ int main(int argc, char **argv)
                 s++;
         }
     }
+    if (getenv("PROG")) {                               /* PROG=d,d,..: NEON HARMONY's progression (degrees), the track PROG */
+        const char *s = getenv("PROG");
+        int d, k, c = 0;
+        memset(song.prog, PROG_END, sizeof song.prog);
+        while (c < (int)PROG_N && sscanf(s, "%d%n", &d, &k) == 1) {
+            song.prog[c++] = (uint8_t)d;
+            s += k;
+            if (*s == ',')
+                s++;
+        }
+        song.prog_bars = getenv("PBARS") ? (uint8_t)atoi(getenv("PBARS")) : 0u;
+        inst.p[P_QUANT] = QN_PROG;
+    }
     if (getenv("STEPS")) {                              /* STEPS=n,n,...: a pattern (0 = rest) played by the sequencer */
         const char *s = getenv("STEPS");
         int nt, k, c = 0;
@@ -888,6 +986,11 @@ int main(int argc, char **argv)
         transport_req = 1;
     }
     song.master_q12 = 4096;
+    if (getenv("NEONDEMO")) {
+        fclose(w);
+        remove(out);
+        return neon_demo(getenv("NEONDEMO"));
+    }
     if (getenv("TRACKS")) {
         fclose(w);
         remove(out);

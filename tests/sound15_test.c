@@ -278,7 +278,7 @@ static void test_filter(void)
     {
         uint32_t k, i;
         int32_t pk = 0;
-        fresh(0, preset_by_name(0, "ACID"));
+        fresh(0, preset_by_name(0, "OUTRUN BS"));
         dry(t);
         t->p[P_E5] = 127;
         trk_note_on(t, 45, 120);
@@ -335,7 +335,7 @@ static times_t env_times(const char *name)
     int32_t val = value_of(name);
     uint16_t g = song.g[G_BPM], c = song.g[G_CLOCK];
     uint32_t mb = midi_beat_samples;
-    fresh(0, preset_by_name(0, "SINE KEY"));
+    fresh(0, preset_by_name(0, "GLASS KEY"));
     song.g[G_BPM] = (int16_t)g;
     song.g[G_CLOCK] = (int16_t)c;
     midi_beat_samples = mb;
@@ -497,7 +497,7 @@ static double cost(uint32_t wave, uint32_t ft, uint32_t es)   /* ANALOG SOFT PAD
     track_t *t = &trk[0];
     uint32_t i, rep;
     double best = 1e30;
-    fresh(0, preset_by_name(0, "SOFT PAD"));
+    fresh(0, preset_by_name(0, "VAPOR PAD"));
     t->p[P_VOICE] = V_POLY;
     t->p[P_SUS] = 127;
     t->p[P_E0] = (int16_t)wave;
@@ -566,7 +566,7 @@ static int demos(const char *dir)
     FILE *f;
     track_t *t = &trk[0];
     /* BP: an ACID line, the band swept up and back over 8 s (two bars of 1/16 at 120 BPM, four times) */
-    fresh(0, preset_by_name(0, "ACID"));
+    fresh(0, preset_by_name(0, "OUTRUN BS"));
     t->p[P_FTYPE] = 1;
     t->p[P_E5] = 105;
     t->p[P_E6] = 50;                                      /* some drive: the band's edge */
@@ -585,7 +585,7 @@ static int demos(const char *dir)
         n++;
     }
     /* HP: STRINGS chords, the high-pass rising over each (thinning to air), then falling */
-    fresh(0, preset_by_name(0, "STRINGS"));
+    fresh(0, preset_by_name(0, "JUNO STR"));
     t->p[P_FTYPE] = 2;
     t->p[P_E5] = 50;
     if ((f = demo_open(dir, "analog_hp", 9u * FS / CTL * CTL))) {
@@ -606,7 +606,7 @@ static int demos(const char *dir)
         n++;
     }
     /* ENV SYNC: a plucked chord on every beat, ATK 1/8 REL 1/4 (SUS 50 %), two bars at 90 BPM then two at 150 */
-    fresh(0, preset_by_name(0, "SAW LEAD"));
+    fresh(0, preset_by_name(0, "MIAMI LEAD"));
     t->p[P_VOICE] = V_POLY;
     t->p[P_ESYNC] = 1;
     t->p[P_ATK] = (int16_t)value_of("1/8");

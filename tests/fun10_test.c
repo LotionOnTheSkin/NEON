@@ -558,6 +558,7 @@ static int formats(void)
     st.raw[68u + 4u] |= 0x80u;                       /* a nudge bit in a FUN10 note byte: fine; in a FUN9: refused */
 
     /* FUN9 (1.1), FUN8 (1.0.x), FUN7: as before; the four parameters at their defaults, every nudge 0 */
+    memset(a.prog, 0, sizeof a.prog);                /* (NEON's progression: a FUN10's only) */
     memset(&a.motion, 0, sizeof a.motion);
     for (i = 0; i < 64u; i++)
         a.motion.event[i] = (motion_event_t){(uint8_t)((i % 4u) << 6 | i / 4u), (uint8_t)(i % 5u ? P_REV : P_E0 + 3), (int8_t)(i % 5u ? i : 2)};

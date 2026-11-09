@@ -488,9 +488,9 @@ int main(int argc, char **argv)
         track_t *t = &trk[0];
         voice_t *v;
         uint32_t a, b, st, ok = 1, j, p0;
-        check("engine 13 is SLICE (the protocol's number), two factory presets",
-              ENGINES[SLC_ENG] == &ENG_SLICE && ENG_SLICE.npresets == 2u && str_eq(ENG_SLICE.presets[0].name, "CHOP") &&
-              str_eq(ENG_SLICE.presets[1].name, "STUTTER") && ENG_SLICE.presets[0].pat == 9u && ENG_SLICE.presets[1].pat == 10u, 0);
+        check("engine 13 is SLICE (the protocol's number), two factory presets (NEON's BREAK CHOP, VHS STUTTR)",
+              ENGINES[SLC_ENG] == &ENG_SLICE && ENG_SLICE.npresets == 2u && str_eq(ENG_SLICE.presets[0].name, "BREAK CHOP") &&
+              str_eq(ENG_SLICE.presets[1].name, "VHS STUTTR") && ENG_SLICE.presets[0].pat == 9u && ENG_SLICE.presets[1].pat == 10u, 0);
         slc_bounds(s, SLC_DIV_MAN, 3, &a, &b, &st);
         ok &= slc_count(s, SLC_DIV_MAN) == s->nauto && a == s->apos[3] && b == s->apos[4] && st == s->ast[3];
         ok &= slc_count(&SLC_BREAK, SLC_DIV_MAN) == SLC_BREAK.nauto && !slc_man_begin(SMP_USER_SLOTS);   /* BREAK: AUTO */
