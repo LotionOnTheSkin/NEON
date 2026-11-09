@@ -43,8 +43,9 @@ static uint32_t prog_at(uint32_t b)
     uint32_t n = prog_len();
     return n ? (b / prog_bars()) % n : 0u;
 }
-/* playing: the chord of this block (ahead 1: it crosses into the next bar); stopped: the PROG page's slot */
-static void prog_block(uint32_t ahead)
+/* playing: the chord of this block (ahead 1: it crosses into the next bar); stopped: the PROG page's slot. Out of line,
+ * as prog_follow (once a block; their short loops stay out of the audio ISR's: target_budget.py) */
+static __attribute__((noinline)) void prog_block(uint32_t ahead)
 {
     uint32_t n = prog_len(), i;
     if (!n) {
@@ -99,8 +100,8 @@ static int32_t deg_move(int32_t n, int32_t d, uint32_t mask, int32_t r)
         }
     return r + 12 * oct + i;
 }
-/* a note of a PROG track, as the chord now playing has it */
-static int32_t prog_follow(const track_t *t, int32_t n)
+/* a note of a PROG track, as the chord now playing has it (a key, a step's note: out of line) */
+static __attribute__((noinline)) int32_t prog_follow(const track_t *t, int32_t n)
 {
     uint32_t mask = prog_mask(t);
     int32_t r = t->p[P_ROOT], cnt = (int32_t)bits12(mask), d = prog_deg;

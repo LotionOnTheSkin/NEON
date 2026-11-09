@@ -82,6 +82,13 @@ jobs:
           name: neon-firmware-${{ github.sha }}
           path: dist/
 
+      - name: Keep the disassembly (tests/target_budget.py reads it; for looking into a cost change)
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-disassembly-${{ github.sha }}
+          path: build/felucca.dis
+          if-no-files-found: ignore
+
       - name: Publish as the neon-latest release
         env:
           GH_TOKEN: ${{ github.token }}
