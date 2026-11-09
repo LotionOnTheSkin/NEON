@@ -921,7 +921,8 @@ static int pc_test(void)
         uint8_t v[FP_SIZE + 1u];
         set_engine_of(f, ENGI_FM6);
         pc(1, 4); frame();
-        ok = f->preset == 4 && f->p[P_E7] == 4 && fm6_slot[1] == 4u && f->p[P_E6] == 30;   /* PAD: F5, DTUN 30 */
+        ok = f->preset == 4 && f->p[P_E7] == 4 && fm6_slot[1] == 4u &&   /* (NEON: GLASS PAD) F5, its DTUN */
+             f->p[P_E6] == ENGINES[ENGI_FM6]->presets[4].e[6];
         bad += check("  FM6: 0..7 its presets (PC 4: PAD, SLOT F5, its DTUN)", ok);
         pc(1, 8); frame();
         ok = f->p[P_E7] == 4 && fm6_slot[1] == 4u;
@@ -930,7 +931,7 @@ static int pc_test(void)
         pc(1, 8); frame();
         fm6_unpack(FM6_FACTORY[2], v);
         ok &= f->p[P_E7] == (int16_t)(FM6_OWN + 1u) && fm6_slot[1] == FM6_OWN + 1u && pc_bank_k == 0u &&
-              !memcmp(v, fm6_patch[1], FP_SIZE) && f->p[P_E6] == 30 && f->preset == 4;
+              !memcmp(v, fm6_patch[1], FP_SIZE) && f->p[P_E6] == ENGINES[ENGI_FM6]->presets[4].e[6] && f->preset == 4;
         pc(1, 9); frame();
         ok &= f->p[P_E7] == (int16_t)(FM6_OWN + 1u);
         pc(1, 13); frame();
@@ -938,7 +939,7 @@ static int pc_test(void)
         pc(1, 8u + FM6_NBANK); frame();
         ok &= f->p[P_E7] == (int16_t)(FM6_OWN + 6u);
         pc(1, 0); frame();
-        ok &= f->p[P_E7] == 0 && fm6_slot[1] == 0u && f->p[P_E6] == 0;
+        ok &= f->p[P_E7] == 0 && fm6_slot[1] == 0u && f->p[P_E6] == ENGINES[ENGI_FM6]->presets[0].e[6];
         fm6_bank_used = 0;
         fm6_bank_read = 0;
         bad += check("  FM6: 8.. the voice bank B1..B32 through SLOT (the rest stays), an empty or no bank ignored", ok);

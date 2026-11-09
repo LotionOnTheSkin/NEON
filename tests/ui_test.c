@@ -429,12 +429,12 @@ static int test_sound_loads(void)
                  t->p[P_TRANS] == 5 && t->p[P_SLCR] == SL_GATE && t->p[P_SLPAT] == 4 && t->p[P_LEVEL] == 90);
     bad += check("..and no warning about the sequence", !msg_is("T1 SEQ REPLACED"));
     for (i = 0; i < ENGINES[0]->npresets; i++)
-        if (str_eq(ENGINES[0]->presets[i].name, "RAVE"))
+        if (str_eq(ENGINES[0]->presets[i].name, "DIGI PLUCK"))   /* (NEON: was RAVE) */
             break;
     t->p[P_AMODE] = 0;
     t->preset = (uint8_t)(i - 1u);
     turn(EN_PRESET, 1);
-    bad += check("RAVE (an ARP preset) leaves the arp off; it suggests pattern 13 ARP", t->preset == i && t->p[P_AMODE] == 0 &&
+    bad += check("DIGI PLUCK (an ARP preset) leaves the arp off; it suggests pattern 13 ARP", t->preset == i && t->p[P_AMODE] == 0 &&
                  preset_pat_hint() == 12 && ui.ppick == 12 && str_eq(PATTERNS[12].name, "ARP"));
     t->p[P_AMODE] = 2;
     before = *t;
@@ -5110,7 +5110,7 @@ static int test_fm4_retired(void)
     uint8_t v[FP_SIZE + 1u];
     ui_power_on();
     bad += check("power-on: track 2 is FM6 PAD (TRK_DEF, was DIGITAL PAD)", trk[1].eng_req == ENGI_FM6 &&
-                 str_eq(ENGINES[ENGI_FM6]->presets[trk[1].preset].name, "PAD"));
+                 str_eq(ENGINES[ENGI_FM6]->presets[trk[1].preset].name, "GLASS PAD"));   /* (NEON: was PAD) */
     preset_all_pos(&total);
     for (i = 0; i < total; i++) {
         e = preset_all_at(i, &k);
@@ -8801,6 +8801,8 @@ static int test_song_lanes(void)
     int bad = 0, ok;
     uint32_t n = 0, h, k, i, st, rev[NTRK];
     h = song_probe(&n);
+    if (h != SONG_PROBE_GOLDEN || n != SONG_PROBE_BLOCKS)
+        printf("song probe: 0x%08X, %u blocks\n", (unsigned)h, (unsigned)n);
     bad += check("SONG of rows (one slot each): bit for bit as before lanes, block by block (song_probe.h)",
                  h == SONG_PROBE_GOLDEN && n == SONG_PROBE_BLOCKS);
     seq_stop();
@@ -9173,11 +9175,11 @@ static int test_fm6_foot_name(void)
     song.sel = 1;                                    /* T2: FM6 PAD (SLOT F5) */
     tr = song.sel;
     sound_name(TSEL, b);
-    ok = TSEL->eng_req == ENGI_FM6 && fm6_slot[tr] == 4u && str_eq(b, "PAD");
+    ok = TSEL->eng_req == ENGI_FM6 && fm6_slot[tr] == 4u && str_eq(b, "GLASS PAD");
     fm6_patch[tr][3u * FP_OP + FP_OL] ^= 1u;         /* the factory patch edited: SLOT OWN, the name stays */
     fm6_adopt(tr);
     sound_name(TSEL, b);
-    ok &= fm6_slot[tr] == FM6_OWN && str_eq(b, "PAD");
+    ok &= fm6_slot[tr] == FM6_OWN && str_eq(b, "GLASS PAD");
     bad += check("#309 FM6 footer: the preset's name on F5 and on its edited patch (OWN)", ok);
     fm6_bank_used = 1u;
     fm6_bank_read = ft_bank_read;
@@ -9192,7 +9194,7 @@ static int test_fm6_foot_name(void)
     TSEL->p[P_E7] = 4;
     fm6_poll();
     sound_name(TSEL, b);
-    bad += check("#309 FM6 footer: back on F5, the preset's name", fm6_slot[tr] == 4u && str_eq(b, "PAD"));
+    bad += check("#309 FM6 footer: back on F5, the preset's name", fm6_slot[tr] == 4u && str_eq(b, "GLASS PAD"));
     fm6_bank_used = 0;
     fm6_bank_read = 0;
     return bad;

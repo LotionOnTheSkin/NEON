@@ -317,11 +317,14 @@ static int32_t drum_keys(const track_t *t, uint32_t k)
 
 /* {KIT, TUNE, TONE, DECY, SNAP, ACC, KICK, DRV}; every kit suggests the BEAT pattern (GM notes) */
 static const preset_t DRUM_PRESETS[] = {
+    /* (index 0 stays the DRUM KIT: old projects' SAMPLE PERC / PHYS kits convert to it, core.h) */
     {"DRUM KIT", DRUM_KIT_E, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 20), PAT(12)},   /* (core.h: SAMPLE PERC's too) */
-    /* 1.5.6 (Discussion #216): the new kits, appended */
-    {"DEEP KIT", {DK_DEEP, 64, 64, 64, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 28), PAT(12)},
-    {"TIGHT KIT", {DK_TIGHT, 64, 64, 56, 64, 100, 0, 16}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 8), PAT(12)},
-    {"PERC KIT", {DK_PERC, 64, 64, 64, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 24), PAT(12)},
+    /* NEON: synthwave kits. {KIT, TUNE, TONE, DECY, SNAP, ACC, KICK, DRV}; REVERB sends for the 80s rooms */
+    {"GATED 85", {DK_77, 64, 72, 50, 80, 100, 0, 10}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 60), PAT(12)},
+    {"808 NIGHT", {DK_80, 58, 60, 90, 64, 100, 1, 0}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 25), PAT(12)},
+    {"DRIVE KIT", {DK_TIGHT, 64, 70, 56, 90, 100, 0, 40}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 15), PAT(12)},
+    {"NEON KIT", {DK_DEEP, 64, 78, 62, 80, 100, 0, 20}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 40), PAT(12)},
+    {"PERC 84", {DK_PERC, 64, 70, 60, 70, 100, 0, 0}, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 35), PAT(12)},
 };
 
 static const engine_t ENG_DRUM = {

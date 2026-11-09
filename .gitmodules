@@ -1,8 +1,5 @@
-# Felucca-Engines (MIT): the ANALOG LOFI TRIO WHEEL NOISE PHASE engines, dsp.c, felucca_engine.h, their tables.
+# Felucca-Engines (MIT) is vendored in firmware/engines (NEON edits its presets; its LICENSE kept there).
 # felucca-bsp (MPL-2.0): the hardware layer (chip/, boards/fm1/).
-[submodule "firmware/engines"]
-	path = firmware/engines
-	url = https://github.com/hugelton/Felucca-Engines.git
 [submodule "firmware/bsp"]
 	path = firmware/bsp
 	url = https://github.com/hugelton/felucca-bsp.git

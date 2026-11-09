@@ -10,7 +10,12 @@
  *   WAVE PWM    a Juno-style DCO: two pulse waves (the second detuned by SPRD, up to 30 cents) whose width the voice's
  *               LFO sweeps (MOVE: up to +-25 % of the cycle, the two in opposite directions) on top of the shape
  *               routings, plus SAW, the same DCOs' saws mixed in (Juno 106: saw and pulse at once).
- *   WAVE SUB    a bass voice: two saws (the second detuned by SPRD) and a square an octave below (SUB). The phases
+ *   WAVE JUNO   one Juno-60 DCO: a pulse whose width the voice's LFO sweeps (PWM: up to +-45 % of the cycle around
+ *               50 %), its saw (SAW) and the sub square an octave down, divided from the DCO itself (SUB), so it is locked
+ *               to it. No detune and no drift: a DCO. RATE (in place of WARM) is the LFO's rate, 0.05..40 Hz as the
+ *               track LFO's; the LFO runs free, every note from its own point. (Made to rebuild a TAL U-NO-LX pad.)
+ *   WAVE SUB    a bass voice: two saws (the second detuned by SPRD) and a square an octave below (SUB: up to twice
+ *               the saws' level, for a Juno-style sub-heavy bass). The phases
  *               restart with every note, so each one hits the same way: punchy, sequenced 8th/16th-note bass.
  *
  *   MOVE also gives each note its own small tuning offset (up to +-3.3 cents) and a slow pitch wobble (up to +-3.4
@@ -27,11 +32,14 @@
  *   s[4], s[5]  outer side saws (SUPER), as phases (uint32 in int32)
  *   s[2]        the note's random seed (its drift and LFO rate)      s[3]  the LFO's phase
  * keep: the filters and the outer saws' phases (bits 0, 1, 4..7): a retriggered voice glides on, as on an analog. */
-static const char *const N_NEON_WAVE[] = {"SUPER", "PWM", "SUB"};
-enum { NW_SUPER, NW_PWM, NW_SUB };
+static const char *const N_NEON_WAVE[] = {"SUPER", "PWM", "SUB", "JUNO"};
+enum { NW_SUPER, NW_PWM, NW_SUB, NW_JUNO };
 static const param_desc_t NEON_SIDE = {"SIDE", F_PCT, 0, 127, 90, 0, 0};   /* E2's range and default, per WAVE */
 static const param_desc_t NEON_SAW = {"SAW", F_PCT, 0, 127, 90, 0, 0};
-static const param_desc_t NEON_SUB = {"SUB", F_PCT, 0, 127, 90, 0, 0};
+static const param_desc_t NEON_SUB = {"SUB", F_PCT, 0, 127, 45, 0, 0};    /* 64: the saws' level, 127: twice it */
+static const param_desc_t NEON_J_SUB = {"SUB", F_PCT, 0, 127, 50, 0, 0};    /* JUNO: E1, E3 and E6 too */
+static const param_desc_t NEON_J_PWM = {"PWM", F_PCT, 0, 127, 40, 0, 0};
+static const param_desc_t NEON_J_RATE = {"RATE", F_LFOHZ, 0, 127, 67, 0, 0};
 
 /* the LFO: 0.5 Hz a block (CTL samples) plus up to 0.5 Hz more, a note's own (its seed) */
 #define NEON_LFO_BASE ((uint32_t)(((uint64_t)CTL << 31) / (uint64_t)FS))
@@ -42,9 +50,12 @@ static const param_desc_t NEON_SUB = {"SUB", F_PCT, 0, 127, 90, 0, 0};
 #define NEON_TRIM_SUPER 10322    /* 0.63 (-4.0 dB) */
 #define NEON_TRIM_PWM 11796      /* 0.72 (-2.9 dB) */
 #define NEON_TRIM_SUB 13926      /* 0.85 (-1.4 dB) */
+#define NEON_TRIM_JUNO 11796     /* 0.72 (-2.9 dB), as PWM */
 
 static const param_desc_t *neon_desc(const track_t *t, uint32_t k)
 {
+    if (t->p[P_E0] == NW_JUNO)
+        return k == 1u ? &NEON_J_SUB : k == 2u ? &NEON_SAW : k == 3u ? &NEON_J_PWM : k == 6u ? &NEON_J_RATE : 0;
     if (k != 2u)
         return 0;
     switch (t->p[P_E0]) {
@@ -147,6 +158,31 @@ static void neon_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
             }
             out[i] += voice_amp(s, m, i) * 2;
         }
+    } else if (wave == NW_JUNO) {
+        /* one DCO: the pulse's width 50 % + the shape routings (+-12.5 %) + the LFO x PWM (+-45 %); its saw at SAW;
+         * the sub a square an octave down, its phase the DCO's with one more bit on top (ph2's bit 31): locked to it */
+        int32_t so = shl(m->shape - (64 << 8), 15), lo = lt * move * 463;   /* +-0x7300_0000 at 127 */
+        int32_t ow = clamp(so + lo, -0x73000000, 0x73000000);
+        uint32_t pw = 0x80000000u + (uint32_t)ow, inc = m->inc, inc2 = m->inc >> 1, hi = ph2 & 0x80000000u;
+        int32_t sw = blnd * 258, sb = sprd * 258;                /* SAW, SUB: Q15 */
+        int32_t norm = (int32_t)((32767u * 32768u) / (uint32_t)(32768 + ((sw * 11) >> 4) + ((sb * 11) >> 4)));
+        for (i = 0; i < n; i++) {
+            uint32_t sp = hi | (ph0 >> 1);
+            int32_t sa = osc_saw(ph0, inc);
+            int32_t pa = (sa - osc_saw(ph0 + pw, inc)) >> 1;
+            int32_t sq = osc_pulse(sp, inc2, 0x80000000u);
+            int32_t s = ((sw * sa) >> 15) - pa + ((sb * sq) >> 15);   /* the pulse inverted against the saw, as the DCO */
+            s = ((s >> 1) * norm) >> 14;
+            if (ph0 + inc < ph0)                                 /* the DCO wrapped: the divider flips */
+                hi ^= 0x80000000u;
+            ph0 += inc;
+            {
+                int32_t y = tsvf_lp(&f2, tsvf_lp(&f1, s >> 1, &a1, &a2), &b1, &b2);
+                s = (soft_knee(y, 16000) * NEON_TRIM_JUNO) >> 13;
+            }
+            out[i] += voice_amp(s, m, i) * 2;
+        }
+        ph2 = hi | (ph0 >> 1);
     } else if (wave == NW_PWM) {
         /* the width: 50 % + the shape routings (+-12.5 %) + the LFO x MOVE (+-25 %), B swept the other way */
         int32_t so = shl(m->shape - (64 << 8), 15), lo = shl(((lt * move) >> 7), 15);
@@ -175,12 +211,12 @@ static void neon_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
         /* SUB: saw A, saw B (+SPRD: up to +30 ct, wobbling a little the other way), a square an octave down */
         uint32_t inc1 = neon_det(m->inc, sprd * 71 / 127 - wob);
         uint32_t inc2 = inc0 >> 1;
-        int32_t sg = blnd * 258;
+        int32_t sg = blnd * 516;                                 /* SUB: 0..2, Q15 */
         int32_t norm = (int32_t)((32767u * 32768u) / (uint32_t)(32768 + ((sg * 5) >> 3)));    /* 1 / (1 + 0.6 sg) */
         for (i = 0; i < n; i++) {
             int32_t sa = osc_saw(ph0, inc0), sb = osc_saw(ph1, inc1);
             int32_t sq = osc_pulse(ph2, inc2, 0x80000000u);
-            int32_t s = ((sa + sb) >> 1) + ((sg * sq) >> 15);
+            int32_t s = ((sa + sb) >> 1) + ((sg >> 1) * sq >> 14);
             s = ((s >> 1) * norm) >> 14;
             ph0 += inc0;
             ph1 += inc1;
@@ -203,7 +239,8 @@ static void neon_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     v->s[1] = a2;
     v->s[6] = b1;
     v->s[7] = b2;
-    v->s[3] = (int32_t)(lph + NEON_LFO_BASE + (NEON_LFO_BASE >> 16) * ((seed >> 8) & 0xFFFFu));
+    v->s[3] = (int32_t)(lph + (wave == NW_JUNO ? LFO_INC[p[P_E6] & 127]
+                                               : NEON_LFO_BASE + (NEON_LFO_BASE >> 16) * ((seed >> 8) & 0xFFFFu)));
 }
 
 /* the presets: e = WAVE SPRD BLND MOVE CUT RES WARM KTR; env = ATK DEC SUS REL (1 ms x 10000^(v/127): 64 ~0.1 s,
@@ -211,7 +248,7 @@ static void neon_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
 static const preset_t NEON_PRESETS[] = {
     {"NEON SKY", {0, 70, 100, 40, 72, 15, 15, 40}, {95, 90, 120, 105}, 12, 0, FX(0, 70, 25, 85), PAT(5)},
     {"SUMMERS", {1, 40, 50, 70, 78, 10, 20, 48}, {85, 90, 115, 98}, 8, 0, FX(0, 90, 20, 70), PAT(5)},
-    {"DRIVE BS", {2, 8, 90, 5, 38, 35, 45, 64}, {0, 62, 20, 40}, 40, 1, FX(10, 0, 0, 10), PAT(2)},
+    {"DRIVE BS", {2, 8, 45, 5, 38, 35, 45, 64}, {0, 62, 20, 40}, 40, 1, FX(10, 0, 0, 10), PAT(2)},
     {"NIGHT BS", {1, 0, 0, 10, 30, 20, 30, 64}, {0, 70, 70, 35}, 25, 1, FX(0, 10, 0, 5), PAT(8)},
     {"HERO LD", {0, 35, 60, 25, 95, 25, 35, 64}, {10, 80, 100, 70}, 15, 1, FX(5, 30, 60, 45), PAT(4)},
     {"BRASS 85", {0, 30, 70, 15, 50, 15, 30, 64}, {40, 75, 95, 55}, 40, 0, FX(0, 30, 15, 45), PAT(6)},
@@ -219,15 +256,27 @@ static const preset_t NEON_PRESETS[] = {
     {"ARP PLK", {1, 20, 30, 20, 45, 40, 15, 64}, {0, 68, 0, 55}, 45, 0, FX(0, 40, 65, 40), PAT(13)},
     {"VHS STR", {1, 60, 70, 127, 70, 5, 40, 48}, {90, 90, 118, 100}, 0, 0, FX(5, 100, 15, 75), PAT(5)},
     {"MIDNIGHT", {0, 90, 110, 60, 45, 25, 20, 30}, {105, 100, 120, 110}, 20, 0, FX(0, 60, 30, 100), PAT(5)},
-    {"SUB DRV", {2, 0, 127, 0, 28, 0, 60, 64}, {0, 60, 100, 30}, 10, 1, FX(0, 0, 0, 0), PAT(8)},
-    {"OUTRUN", {2, 20, 60, 8, 55, 50, 50, 64}, {0, 58, 10, 35}, 50, 1, FX(15, 0, 10, 10), PAT(1)},
+    {"SUB DRV", {2, 0, 64, 0, 28, 0, 60, 64}, {0, 60, 100, 30}, 10, 1, FX(0, 0, 0, 0), PAT(8)},
+    {"OUTRUN", {2, 20, 30, 8, 55, 50, 50, 64}, {0, 58, 10, 35}, 50, 1, FX(15, 0, 10, 10), PAT(1)},
+    /* Neon Summers' own patches, rebuilt from recordings of them on a TAL U-NO-LX (fitted against the
+     * recordings, rendered with this code): "VOLT_PAD", a Juno PWM pad at 1.7 Hz, and "KEY Miami Plucks" at 2 Hz */
+    {"VOLT PAD", {3, 0, 23, 65, 39, 0, 67, 103}, {0, 116, 67, 112}, 48, 0, FX(0, 80, 0, 0), PAT(5)},
+    {"MIAMI PLK", {3, 0, 36, 38, 48, 61, 70, 125}, {0, 102, 58, 119}, 63, 0, FX(0, 70, 0, 0), PAT(6)},
+    /* and "VOLT BASS I" (TAL U-NO-LX): saw and a loud sub, a 24 dB filter snapping shut, Juno chorus II */
+    {"VOLT BASS", {2, 0, 82, 0, 25, 5, 40, 66}, {0, 89, 35, 71}, 63, 1, FX(0, 50, 0, 0), PAT(2)},
+    /* and "PAD - Analog Pad": pulse, saw and sub, the pulse swept full depth at 0.8 Hz, the filter left alone */
+    {"ANALOG PAD", {3, 28, 94, 126, 71, 0, 53, 28}, {0, 46, 95, 100}, 4, 0, FX(0, 70, 0, 20), PAT(5)},
+    /* more JUNO: a chorused arp pluck, PWM strings and a swelling synth brass */
+    {"JUNO ARP", {3, 30, 80, 40, 40, 40, 70, 64}, {0, 70, 0, 60}, 50, 0, FX(0, 60, 55, 30), PAT(13)},
+    {"PWM STRNG", {3, 0, 110, 70, 64, 10, 60, 40}, {70, 90, 115, 95}, 6, 0, FX(0, 85, 0, 60), PAT(5)},
+    {"SYNTH BRAS", {3, 20, 120, 20, 38, 20, 64, 64}, {30, 74, 100, 50}, 40, 0, FX(0, 40, 20, 40), PAT(6)},
 };
 
 static const engine_t ENG_NEON = {
     .name = "NEON",
     .page_title = {"OSC", "FLT"},
     .edit = {
-        {"WAVE", F_ENUM, 0, 2, 0, N_NEON_WAVE, 0},
+        {"WAVE", F_ENUM, 0, 3, 0, N_NEON_WAVE, 0},
         {"SPRD", F_PCT, 0, 127, 50, 0, 0},
         {"BLND", F_PCT, 0, 127, 90, 0, 0},
         {"MOVE", F_PCT, 0, 127, 30, 0, 0},

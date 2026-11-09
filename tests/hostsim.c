@@ -929,6 +929,8 @@ int main(int argc, char **argv)
         }
         if (getenv("NOTE"))             /* NOTE=k: one key (7 = C4, see OCT) held to 0.5 s before the end */
             fm1_in.notes = (f > FS / 20 && f + FS / 2 < frames) ? 1u << atoi(getenv("NOTE")) : 0;
+        if (getenv("HOLD"))             /* HOLD=ms: C4 (key 7) held from the start for ms, then released */
+            fm1_in.notes = (uint64_t)f * 1000u < (uint64_t)FS * (uint32_t)atoi(getenv("HOLD")) ? 1u << 7 : 0;
         if (getenv("VSWEEP"))           /* VSWEEP=1: EDIT 1 (P_E0) from 0 to 127 over the render */
             inst.p[P_E0] = (int16_t)((uint64_t)f * 128u / frames);
         if (getenv("PSWEEP")) {         /* PSWEEP=id:from:to: a track parameter from .. to over the render */

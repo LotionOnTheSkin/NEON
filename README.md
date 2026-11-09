@@ -7,14 +7,22 @@ analog drift (MOVE). Everything else is Felucca as it is upstream.
 - **Download:** [Releases › neon-latest › `neon.fwsc`](../../releases/tag/neon-latest), built by GitHub Actions on every push
   (`.github/workflows/build-neon.yml`).
 - **Try it in the browser:** open the [FM-1 emulator](https://joakimeriksson.github.io/fm1-emu), load `neon.fwsc`, press Start.
-- **Play it:** NEON is the last engine. On the PRESETS page, turn the ENG knob to NEON. Twelve presets: NEON SKY,
-  SUMMERS, DRIVE BS, NIGHT BS, HERO LD, BRASS 85, STAB, ARP PLK, VHS STR, MIDNIGHT, SUB DRV, OUTRUN.
+- **Play it:** NEON is the last engine. On the PRESETS page, turn the ENG knob to NEON. Its presets: NEON SKY,
+  SUMMERS, DRIVE BS, NIGHT BS, HERO LD, BRASS 85, STAB, ARP PLK, VHS STR, MIDNIGHT, SUB DRV, OUTRUN, then Neon Summers'
+  own patches rebuilt from recordings (VOLT PAD, MIAMI PLK, VOLT BASS, ANALOG PAD; and DBL IMPACT on ANALOG), then
+  JUNO ARP, PWM STRNG and SYNTH BRAS.
+- **Synthwave presets everywhere:** every engine's factory presets are replaced with synthwave sounds (ANALOG's
+  MIAMI LEAD and VAPOR PAD, PHASE's CZ sounds, LOFI's chip leads, TRIO's MEGA BASS, WHEEL's CATHEDRAL, NOISE's
+  UPLIFTER riser, VOICE's VOX PAD, GRAIN's DREAM CLOUD, PHYS's STAR BELLS and SIMMONS, the 80s FM sounds on FM6,
+  DRUM's GATED 85 / 808 NIGHT / DRIVE KIT / NEON KIT / PERC 84; DRUM KIT stays first for older projects).
+  Felucca-Engines is vendored in `firmware/engines` (MIT, its LICENSE kept) so its presets can change.
 - **The look:** Sunset Drive. A sun-and-grid boot screen, the SUNSET palette (deep indigo, magenta, cyan) as the default
   (MENU > COLOR still offers Felucca's palettes), and Chakra Petch type throughout.
 - **SUNSET DRIVE:** tap HOME from HOME to step HOME > MIXER > CLOCK > **DRIVE**: a visualizer where the grid rolls
   toward you one line a beat (it follows the tempo and stops when you stop), the sun swells with the loudest track,
   the horizon glows with the bass, and a light per track shines in the sky.
-- **The engine:** `firmware/src/eng_neon.c` (MIT). WAVE (SUPER / PWM / SUB), SPRD, BLND, MOVE, CUT, RES, WARM, KTR.
+- **The engine:** `firmware/src/eng_neon.c` (MIT). WAVE (SUPER / PWM / SUB / JUNO), SPRD, BLND, MOVE, CUT, RES, WARM,
+  KTR. JUNO is one Juno-60 DCO: pulse with LFO PWM, saw, a locked sub; its knobs read SUB, SAW, PWM and RATE.
 - **Status:** experimental. It passes Felucca's host test suite; it has not yet been played on a real FM-1. Its CPU
   cost was estimated on a computer (about 2 to 2.5 ANALOG voices a voice), so it is capped at 6 voices.
 

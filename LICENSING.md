@@ -23,8 +23,8 @@ with `FELUCCA_ADPCM=1`, not by default). The firmware built with them is GPL-3.0
 
 Six engines and the code they share are under the MIT licence, not the GPL. They are
 Hügelton Instruments' own work and live in their own repository, Felucca-Engines
-(<https://github.com/hugelton/Felucca-Engines>), included here as the git submodule
-`firmware/engines/`: the ANALOG, LOFI, TRIO, WHEEL, NOISE and PHASE engines (`eng_analog.c`,
+(<https://github.com/hugelton/Felucca-Engines>). NEON vendors a copy of it (commit d026007, its factory presets
+replaced with NEON's) in `firmware/engines/`, still under the MIT licence: the ANALOG, LOFI, TRIO, WHEEL, NOISE and PHASE engines (`eng_analog.c`,
 `eng_lofi.c`, `eng_trio.c`, `eng_wheel.c`, `eng_noise.c`, `eng_phase.c`), the engine interface
 (`felucca_engine.h`), the shared DSP helpers (`dsp.c`) and the generator of their tables
 (`SPDX-License-Identifier: MIT`, `firmware/engines/LICENSE`, also
