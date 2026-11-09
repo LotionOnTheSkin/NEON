@@ -26,7 +26,10 @@ analog drift (MOVE). Everything else is Felucca as it is upstream.
   and move with each chord, by scale steps, the shorter way, so a bass, a pad and an arp written once play the whole
   progression. ROOT is the key. SLOT / CHORD edit the eight chords (OWN), BARS sets 1, 2 or 4 bars a chord; stopped,
   the keys play SLOT's chord. A MOOD on a new song drops starter phrases into the empty tracks (a 16th bass, a held
-  triad, a 16th arp, a beat): pick a mood, press PLAY. The progression is saved with the project.
+  triad, a 16th arp, a beat): pick a mood, press PLAY. The progression is saved with the project, and in a SONG
+  (GLO) each section plays the progression of its slot, from its first chord.
+- **Long patterns:** up to 64 steps a track (hold SEQ: LEN; DOUBLE / HALF). On STEP, the PRESETS knob turns a page
+  of 16 a detent when the pattern is longer (KNOB 1 a step), and pills over the piano roll show the page.
 - **PUMP:** the SLICER's fourth mode: the track ducks on every beat (DEPTH) and swells back (PAT: how slowly): the
   sidechain pump, in time at any tempo.
 - **Stereo chorus:** the chorus bus is a Juno's now: two taps swept against each other, one left, one right.

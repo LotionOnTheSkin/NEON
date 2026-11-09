@@ -222,6 +222,11 @@ static void graph_roll(const track_t *t, uint16_t c)
             }
         }
     }
+    if (len > 16u) {                                  /* NEON: the pages, a pill each (the one shown lit), over the C names */
+        uint32_t np = (len + 15u) / 16u, p;
+        for (p = 0; p < np && p < 4u; p++)
+            cv_rect(3 + (int32_t)p * 5, 0, 4, 3, p == ui.bank ? T_ACCENT : T_RAISE);
+    }
     for (i = 0; i <= ncol; i++)                       /* step lines, the beats brighter */
         cv_rect(PR_X0 + (int32_t)i * PR_CW, PR_Y0, 1, ybot - PR_Y0, i % 4u ? T_GRID : T_RAISE);
     for (i = 0; i < ncol; i++) {

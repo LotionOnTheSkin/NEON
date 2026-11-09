@@ -27,6 +27,8 @@ static const uint8_t PROG_MOOD[MOOD_COUNT][PROG_N] = {
     {5, 6, 0, 0, 7, 7, 7, 7},          /* RISE: VI VII i i */
 };
 static volatile uint32_t prog_bar;     /* whole bars since PLAY (seq.c: the beat's wrap) */
+static volatile uint8_t prog_fresh;    /* a SONG section just started (song_chain.c chain_apply): its first chord, the
+                                        * bar line next counts no bar (the section's first bar is bar 0) */
 static volatile uint8_t prog_deg;      /* the degree playing now (events_block, before the steps) */
 
 static uint32_t prog_len(void)
@@ -52,7 +54,7 @@ static __attribute__((noinline)) void prog_block(uint32_t ahead)
         prog_deg = 0;
         return;
     }
-    i = song.playing ? prog_at(prog_bar + ahead) : (song.prog_cur < n ? song.prog_cur : 0u);
+    i = song.playing ? prog_at(prog_bar + (prog_fresh ? 0u : ahead)) : (song.prog_cur < n ? song.prog_cur : 0u);
     prog_deg = song.prog[i];
 }
 

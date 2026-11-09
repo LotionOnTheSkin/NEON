@@ -1280,6 +1280,7 @@ static uint32_t chain_prepare(void)
             project_t *p = &proj_scratch;
             if (!proj_import(p, &proj_slot[i], sizeof(project_store_t))) return 3u + i;
             chain.source[i].motion = p->motion;
+            memcpy(chain.source[i].prog, p->prog, sizeof p->prog);   /* NEON HARMONY: its progression */
             /* A song keeps its current instruments. Engine-specific motion from
              * another instrument would change a kit/wave/algorithm unexpectedly. */
             {

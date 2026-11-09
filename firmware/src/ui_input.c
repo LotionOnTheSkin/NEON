@@ -1383,6 +1383,19 @@ static void presets_turn(int32_t s)
         nudge_turn(held, s);
         return;
     }
+    if (!ui.home && g == GR_ROLL && TSEL->p[P_SLEN] > 16) {   /* NEON: STEP with more than 16: a page a detent */
+        if (chain_busy()) {
+            ui_message("STOP TO EDIT");
+            return;
+        }
+        for (; s > 0; s--)
+            page_go(1);
+        for (; s < 0; s++)
+            page_go(-1);
+        ui.hot_col = 0;
+        ui.hot_t = 40;
+        return;
+    }
     if (ui.home || g == GR_BROWSE) {
         preset_step(s);
     } else if (g == GR_ROLL || g == GR_USER || g == GR_SLOTS || g == GR_PATS || g == GR_SONG || g == GR_EVENTS) {

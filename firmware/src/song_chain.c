@@ -13,11 +13,14 @@
  * start together from their step 1, as rows always did.
  * A silent track ("-", CHAIN_SILENT) plays nothing in that section: at its start the track's sequenced notes are
  * released (seq_release, as at every section) and its automation goes back to the sound's own values (motion_restore);
- * no step, automation or lock of any slot plays there. Live keys and the arp still play it (the sound stays). */
+ * no step, automation or lock of any slot plays there. Live keys and the arp still play it (the sound stays).
+ * NEON HARMONY: each section plays the progression saved with its clock track's slot (project.c PROJ_PROG_OFF; a slot
+ * saved with none: the one there was at PLAY), from its first chord; STOP puts back the editable one. */
 typedef struct {
     step_t step[NTRK][NSTEP];
     int16_t timing[NTRK][4];
     uint8_t qnt[NTRK];                       /* each track's QUANTIZE (P_SQNT) as saved */
+    uint8_t prog[4];                         /* NEON: its progression, packed as saved (project.c proj_prog_from_song) */
     motion_store_t motion;
 } chain_pattern_t;
 static chain_config_t chain_config;
@@ -30,8 +33,11 @@ static struct {
     uint8_t lane[NTRK];                      /* the slot each track plays in this section, CHAIN_SILENT none */
     uint8_t clk;                             /* the track whose loop counts the section (chain_clock) */
     uint8_t rec;
+    uint8_t prog[8], prog_bars;              /* NEON: the editable progression, back on STOP */
     uint32_t carry;
 } chain;
+static volatile uint32_t prog_bar;           /* (prog.c: the bars since PLAY; a section starts its progression again) */
+static volatile uint8_t prog_fresh;          /* (prog.c: a section just started: its first chord until the bar line) */
 /* a silent lane: its steps (empty: nothing plays) and its timing (a 4/4 bar of 1/16: the section's length when every
  * track is silent) */
 static const step_t chain_silent[NSTEP] = {{{0}}};
@@ -113,6 +119,22 @@ static __attribute__((noinline)) void chain_apply(void)
     uint32_t i;
     const chain_row_t *r = &chain.config.row[chain.row];
     chain.clk = (uint8_t)chain_clock(r);
+    {                                        /* NEON HARMONY: the clock track's slot's progression, from its top */
+        uint32_t s = r->slot[chain.clk % NTRK];
+        const uint8_t *b = s < 4u ? chain.source[s].prog : 0;
+        uint32_t k, v;
+        if (b && (b[3] & 0x80u)) {
+            v = b[0] | (uint32_t)b[1] << 8 | (uint32_t)b[2] << 16;
+            for (k = 0; k < 8u; k++)
+                song.prog[k] = (uint8_t)((v >> (3u * k)) & 7u);
+            song.prog_bars = (uint8_t)((b[3] & 3u) < 3u ? b[3] & 3u : 0u);
+        } else {
+            memcpy(song.prog, chain.prog, sizeof song.prog);
+            song.prog_bars = chain.prog_bars;
+        }
+        prog_bar = 0;
+        prog_fresh = 1;
+    }
     for (i = 0; i < NTRK; i++) {
         track_t *t = &trk[i];
         uint32_t s = r->slot[i];
@@ -144,6 +166,8 @@ static void chain_start(void)
         memcpy(chain.timing[i], &trk[i].p[P_SLEN], sizeof chain.timing[i]);
         chain.qnt[i] = (uint8_t)trk[i].p[P_SQNT];
     }
+    memcpy(chain.prog, song.prog, sizeof chain.prog);   /* NEON: the editable progression */
+    chain.prog_bars = song.prog_bars;
     chain.row = 0;
     chain.remaining = chain.config.row[0].repeat;
     chain.carry = 0;
@@ -162,6 +186,8 @@ static void chain_stop(void)
         trk[i].p[P_SQNT] = chain.qnt[i];
     }
     song.rec = chain.rec;
+    memcpy(song.prog, chain.prog, sizeof song.prog);   /* NEON: the editable progression back */
+    song.prog_bars = chain.prog_bars;
     chain.running = 0;
 }
 static void chain_tick(uint32_t n)

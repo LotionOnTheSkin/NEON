@@ -916,6 +916,7 @@ static void seq_start(void)
     song.tick = 0;
     beat_pos = 0; beat_n = 0;                      /* the ARP LED's beat from the top too */
     prog_bar = 0;                                   /* (and the progression) */
+    prog_fresh = 0;
     clk_pos = CLK_START;                           /* the metronome's first beat with step 0 */
     song.playing = 1;
     slicer_start();                                /* slicer.c: its step 0 with the sequencer's */
@@ -1502,8 +1503,12 @@ static void events_block(uint32_t n)
         beat_pos -= beat_samples();
         beat_pos = beat_pos < beat_samples() ? beat_pos : 0u;
         beat_n = (beat_n + 1u) & 3u;
-        if (!beat_n && song.playing)
-            prog_bar++;                               /* NEON HARMONY: the bars since PLAY */
+        if (!beat_n && song.playing) {                /* NEON HARMONY: the bars since PLAY (a section's: from 0) */
+            if (prog_fresh)
+                prog_fresh = 0;
+            else
+                prog_bar++;
+        }
     }
     if (song.playing)
         song.tick++;

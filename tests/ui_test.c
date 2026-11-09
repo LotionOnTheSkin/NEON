@@ -2696,8 +2696,8 @@ static int test_presets_knob(void)
             int same_snd = TSEL->preset == before.preset && TSEL->eng_req == before.eng_req &&
                            !memcmp(TSEL->p, before.p, sizeof before.p);
             int same_steps = !memcmp(TSEL->step, before.step, sizeof before.step);
-            if (g == GR_ROLL) {
-                cur_ok &= ui.cursor == 1u && same_snd && same_steps && ui.page == i;
+            if (g == GR_ROLL) {                     /* (NEON: STEP's 32 steps: a page a detent; DETAIL: a step) */
+                cur_ok &= ui.cursor == (str_eq(PAGES[i].title, "DETAIL") ? 1u : 16u) && same_snd && same_steps && ui.page == i;
                 n_cur++;
             } else if (g == GR_USER) {
                 sel_ok &= ui.uslot == uslot + 1u && same_snd && same_steps;
@@ -2720,7 +2720,8 @@ static int test_presets_knob(void)
             }
         }
     }
-    bad += check("#92 PRESETS on STEP (and 1.5.1's DETAIL): the step cursor; the sound and the steps stay", cur_ok && n_cur == 2u);
+    bad += check("#92 PRESETS on STEP (and 1.5.1's DETAIL): the step cursor (NEON: on more than 16 steps STEP's goes a page "
+                 "a detent); the sound and the steps stay", cur_ok && n_cur == 2u);
     bad += check("#94 PRESETS on USER, PROJECT, PHRASES, SONG, AUTOMATION: the selection (KNOB 1's); nothing loaded", sel_ok);
     bad += check("#94 PRESETS on TOOLS does nothing", tools_ok);
     bad += check("#94 PRESETS elsewhere (EDIT, ENV, LFO, FX, SCL, ARP, MIXER, GLOBAL, ...): the next sound, the steps stay",
@@ -2732,11 +2733,19 @@ static int test_presets_knob(void)
     TSEL->p[P_SLEN] = 32;
     go_page(GR_ROLL);
     frame();
-    turn(EN_PRESET, 17);
-    grid_ok = grid_on() && ui.cursor == 17u && ui.bank == 1u && TSEL->eng_req == ENGI_DRUM;
-    turn(EN_PRESET, -18);
-    grid_ok &= ui.cursor == 31u;
-    bad += check("#92 the DRUM grid: PRESETS moves the cursor (and the page), as KNOB 1; wraps", grid_ok);
+    turn(EN_K1, 3);
+    turn(EN_PRESET, 1);
+    grid_ok = grid_on() && ui.cursor == 19u && ui.bank == 1u && TSEL->eng_req == ENGI_DRUM;
+    turn(EN_PRESET, 1);
+    grid_ok &= ui.cursor == 3u && ui.bank == 0u;
+    turn(EN_PRESET, -1);
+    grid_ok &= ui.cursor == 19u && ui.bank == 1u;
+    TSEL->p[P_SLEN] = 16;
+    cursor_set(3);
+    turn(EN_PRESET, 1);
+    grid_ok &= ui.cursor == 4u;
+    bad += check("#92 the DRUM grid: PRESETS (NEON) a page a detent on more than 16 steps, the same place on it; wraps; "
+                 "16 steps or fewer: a step, as KNOB 1", grid_ok);
     ui_power_on();
     hold(B_HOME);
     i = ui.menu_sel;
@@ -10036,6 +10045,35 @@ static int test_harmony(void)
                      trk[1].step[0].note[2] == 67 && trk[1].step[1].time == ST_TIE && trk[1].step[15].time == ST_TIE);
         pat_load(&trk[3], k);                       /* (the kit: the note alone) */
         bad += check("HARMONY: on a kit, a chord step loads its note alone", trk[3].step[0].n <= 1u);
+    }
+    {                                               /* SONG: each section its slot's progression, STOP the own */
+        uint32_t k, b;
+        ui_power_on();
+        for (k = 0; k < 2u; k++) {
+            for (b = 0; b < NTRK; b++) {
+                track_defaults_steps(&trk[b]);
+                trk[b].p[P_SLEN] = 16;
+                trk[b].step[0] = (step_t){{60, 0, 0, 0}, 1, ST_NOTE, 0, 96, 0, 0};
+            }
+            prog_set_mood(k ? MOOD_NIGHT : MOOD_DRIVE);
+            project_save(k);
+        }
+        prog_set_mood(MOOD_RISE);
+        chain_config.count = 2;
+        chain_config.row[0] = chain_row_of(0, 1);
+        chain_config.row[1] = chain_row_of(1, 1);
+        ok = chain_prepare() == 0;
+        events_block(CTL);
+        ok &= chain.running && song.prog[1] == 5 && song.prog[2] == 2;             /* section 1: DRIVE */
+        for (b = 0; b < 4u * beat_samples() / CTL + 8u && chain.row == 0u; b++)
+            events_block(CTL);
+        ok &= chain.row == 1u && song.prog[1] == 3 && song.prog[3] == 4 && prog_bar == 0u;   /* section 2: NIGHT */
+        seq_stop();
+        events_block(CTL);
+        ok &= !chain.running && song.prog[0] == 5 && song.prog[1] == 6;           /* STOP: RISE, the one edited */
+        bad += check("HARMONY: SONG plays each section's own progression (its slot's), from its first chord; STOP: the "
+                     "editable one back", ok);
+        chain_defaults(&chain_config);
     }
     ui_power_on();                                  /* MOOD on a new song: a starter in every empty track */
     prog_ui[0] = MOOD_DRIVE;
