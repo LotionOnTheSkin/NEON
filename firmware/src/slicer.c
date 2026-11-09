@@ -119,6 +119,30 @@ static void sl_enter(const track_t *t, sl_t *s)
     }
 }
 
+/* NEON PUMP over m samples of a beat: in fast (to pa), then the swell back (the closure falls by >> psh a sample) */
+static __attribute__((noinline)) void sl_pump(sl_t *s, int32_t *b, int32_t *sd, uint32_t m)
+{
+    uint32_t j;
+    for (j = 0; j < m; j++) {
+        int32_t x = b[j];
+        if (s->pa) {
+            s->gc += 4 * SL_SLOPE;
+            if (s->gc >= s->pa) {
+                s->gc = s->pa;
+                s->pa = 0;
+            }
+        } else {
+            s->gc -= (s->gc >> s->psh) + (s->gc > 0);
+        }
+        if (s->gc > 0) {
+            b[j] = x - mulq16(x, (uint32_t)s->gc << 1);
+            if (sd)
+                sd[j] -= mulq16(sd[j], (uint32_t)s->gc << 1);
+        }
+    }
+    s->w = 0;                                       /* (a STUT repeat that was fading: gone) */
+}
+
 /* m samples of one step (no boundary inside). sd: SPREAD's side signal (fx.c mix_spread) or 0: it gets the gate and
  * the live sound's share of the cross-fade (the repeat is the mono recording: on PAN). Inlined into both callers:
  * slicer_track's (sd 0) is the code it always was */
@@ -130,26 +154,8 @@ static inline __attribute__((always_inline)) void sl_seg(const track_t *t, sl_t 
     int32_t tc = mode == SL_GATE && !s->bit ? depth : 0;           /* gate closure of this step */
     int32_t tn = mode == SL_GATE && !nbit ? depth : 0;             /* .. of the next one */
     int32_t tw = mode == SL_STUT && s->loop ? depth : 0;           /* repeat level */
-    if (mode == SL_PUMP) {                          /* NEON PUMP: in fast, then the swell back */
-        for (j = 0; j < m; j++) {
-            int32_t x = b[j];
-            if (s->pa) {
-                s->gc += 4 * SL_SLOPE;
-                if (s->gc >= s->pa) {
-                    s->gc = s->pa;
-                    s->pa = 0;
-                }
-            } else {
-                s->gc -= (s->gc >> s->psh) + (s->gc > 0);
-            }
-            if (s->w)                               /* (a STUT repeat that was fading: gone) */
-                s->w = 0;
-            if (s->gc > 0) {
-                b[j] = x - mulq16(x, (uint32_t)s->gc << 1);
-                if (sd)
-                    sd[j] -= mulq16(sd[j], (uint32_t)s->gc << 1);
-            }
-        }
+    if (mode == SL_PUMP) {                          /* NEON PUMP (out of line: the GATE / STUT loop as it was) */
+        sl_pump(s, b, sd, m);
         return;
     }
     for (j = 0; j < m; j++) {

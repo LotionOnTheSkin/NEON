@@ -33,7 +33,9 @@ FUNCS = ["analog_render", "digital_render", "digital_render_legacy", "digital_re
          "rev_room", "rev_spring", "rev_hall", "rev_side_mix",   # the reverb bus (fx.c): REVERB TYPE ROOM / SPRING / HALL (and its stereo)
          "track_insert", "ins_drive", "ins_swept",          # the per-track INSERT (fx.c, 1.5), while a TYPE plays
          "adp_render", "adp_block", "adp_post",           # ADPCM (eng_adpcm.c, FELUCCA_ADPCM=1): voices, clock, echo
-         "neon_render"]                                     # NEON (eng_neon.c): SUPER / PWM / SUB voices
+         "neon_render",                                     # NEON (eng_neon.c): SUPER / PWM / SUB / JUNO voices
+         "cho_bus", "cho_side_mix",                         # NEON: the stereo chorus bus (fx.c), out of the ISR's loops
+         "sl_pump"]                                         # NEON: the SLICER's PUMP (slicer.c), while a track pumps
 # built only with FELUCCA_FM4=1 (DIGITAL, src/eng_digital.c; not in the default build, so not in BUDGET): absent,
 # they are skipped; present, checked against these (their budget lines until the engine was retired in 1.0)
 OPTIONAL = {"digital_render": 12, "digital_render_legacy": 333, "digital_render_custom": 558,

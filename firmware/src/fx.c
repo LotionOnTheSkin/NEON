@@ -559,6 +559,47 @@ static __attribute__((noinline)) void rev_switch(const int32_t *rev_in, int32_t 
     fx.rtype = (uint8_t)rt;
 }
 
+/* NEON: the chorus bus for one block, in stereo (see cho_sd): the line, its two taps, their sum into wet (the bus) and
+ * their difference into cho_sd. Out of line (the ISR's loops stay as they were; target_budget.py: cho_bus) */
+static __attribute__((noinline)) void cho_bus(const int32_t *cho_in, int32_t *wet, uint32_t n)
+{
+    uint32_t i;
+    int32_t cdepth = song.g[G_CDEPTH] * 6;
+    uint32_t cinc = LFO_INC[song.g[G_CRATE] & 127] / CTL;
+    for (i = 0; i < n; i++) {
+        int32_t ta, tb, r, s0;
+        cho_buf[fx.cho_w & (CHO_LEN - 1u)] = (int16_t)clamp(cho_in[i] >> 1, -32768, 32767);
+        fx.cho_ph += cinc;
+        s0 = osc_sine(fx.cho_ph);
+        r = (400 << 8) + ((s0 + 32768) * cdepth >> 8);       /* Q8 delay: read between samples */
+        {
+            uint32_t ri = (uint32_t)r >> 8;
+            int32_t f = r & 255, c0 = cho_buf[(fx.cho_w - ri) & (CHO_LEN - 1u)];
+            int32_t c1 = cho_buf[(fx.cho_w - ri - 1u) & (CHO_LEN - 1u)];
+            ta = c0 + (((c1 - c0) * f) >> 8);
+        }
+        r = (400 << 8) + ((32768 - s0) * cdepth >> 8);       /* the other tap: the sweep upside down */
+        {
+            uint32_t ri = (uint32_t)r >> 8;
+            int32_t f = r & 255, c0 = cho_buf[(fx.cho_w - ri) & (CHO_LEN - 1u)];
+            int32_t c1 = cho_buf[(fx.cho_w - ri - 1u) & (CHO_LEN - 1u)];
+            tb = c0 + (((c1 - c0) * f) >> 8);
+        }
+        wet[i] = ta + tb;                                    /* left 2 ta, right 2 tb (cho_sd) */
+        cho_sd[i] = ta - tb;
+        fx.cho_w++;
+    }
+}
+/* the chorus's left and right (cho_sd), after the buses: added to the left of the dry mix, taken from the right */
+static __attribute__((noinline)) void cho_side_mix(int32_t *l, int32_t *r, uint32_t n)
+{
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        l[i] += cho_sd[i];
+        r[i] -= cho_sd[i];
+    }
+}
+
 /* process the three buses for one block; sends in, wet stereo-equal out */
 static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t *rev_in, int32_t *wet,
                      uint32_t n)
@@ -566,36 +607,13 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
     uint32_t i, dl = delay_samples();
     int32_t fb = song.g[G_DFDBK] * 230, col = 2000 + song.g[G_DCOLOR] * 240;
     int32_t dmix = song.g[G_DMIX] * 258;
-    int32_t cdepth = song.g[G_CDEPTH] * 6, rt;
-    uint32_t cinc = LFO_INC[song.g[G_CRATE] & 127] / CTL;
+    int32_t rt;
     if (pf.ew1 && fb < THR_FB)
         fb += mulq16(THR_FB - fb, (uint32_t)pf.ew1 << 1);   /* ECHO THROW (perform.c): more feedback while held, 0.7
                                                              * at most (the loop's gain below 1: it never runs away) */
+    cho_bus(cho_in, wet, n);                         /* NEON: the chorus (stereo) first, into wet */
     for (i = 0; i < n; i++) {
-        int32_t y = 0, x, r;
-        /* chorus: modulated short delay, 5..15 ms */
-        cho_buf[fx.cho_w & (CHO_LEN - 1u)] = (int16_t)clamp(cho_in[i] >> 1, -32768, 32767);
-        fx.cho_ph += cinc;
-        {
-            int32_t ta, tb, s0 = osc_sine(fx.cho_ph);
-            r = (400 << 8) + ((s0 + 32768) * cdepth >> 8);   /* Q8 delay: read between samples */
-            {
-                uint32_t ri = (uint32_t)r >> 8;
-                int32_t f = r & 255, c0 = cho_buf[(fx.cho_w - ri) & (CHO_LEN - 1u)];
-                int32_t c1 = cho_buf[(fx.cho_w - ri - 1u) & (CHO_LEN - 1u)];
-                ta = c0 + (((c1 - c0) * f) >> 8);
-            }
-            r = (400 << 8) + ((32768 - s0) * cdepth >> 8);  /* the other tap: the sweep upside down */
-            {
-                uint32_t ri = (uint32_t)r >> 8;
-                int32_t f = r & 255, c0 = cho_buf[(fx.cho_w - ri) & (CHO_LEN - 1u)];
-                int32_t c1 = cho_buf[(fx.cho_w - ri - 1u) & (CHO_LEN - 1u)];
-                tb = c0 + (((c1 - c0) * f) >> 8);
-            }
-            y += ta + tb;                                    /* left 2 ta, right 2 tb (cho_sd) */
-            cho_sd[i] = ta - tb;
-        }
-        fx.cho_w++;
+        int32_t y = wet[i], x;
         /* delay with a low-passed feedback */
         x = dly_buf[(fx.dly_w - dl) & (DLY_LEN - 1u)];
         fx.dly_lp += mulq15(x - fx.dly_lp, col);
@@ -1088,10 +1106,7 @@ static void mix_block(int32_t *out, uint32_t n)
     fx_buses(send_c, send_d, send_r, wet, n);
     if (hl.side)
         rev_side_mix(mix_l, mix_r, n);                  /* HALL: stereo */
-    for (i = 0; i < n; i++) {                           /* NEON: the chorus's left and right */
-        mix_l[i] += cho_sd[i];
-        mix_r[i] -= cho_sd[i];
-    }
+    cho_side_mix(mix_l, mix_r, n);                      /* NEON: the chorus's left and right */
     if (scope_mix)
         scope_take_mix(n);
     if (perf) {
