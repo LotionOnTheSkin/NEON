@@ -232,13 +232,13 @@ static int kits(void)
         }
     bad += check("KITS (#216): DEEP TIGHT PERC appended (9..11), each lane one of the five kits' (DEEP's kick 2 st down)", ok);
 
-    ok = ENG_DRUM.npresets == 6u && str_eq(ENG_DRUM.presets[0].name, "DRUM KIT") && ENG_DRUM.presets[0].e[0] == DK_STD &&
+    ok = ENG_DRUM.npresets == 10u && str_eq(ENG_DRUM.presets[9].name, "HEX PADS") && str_eq(ENG_DRUM.presets[0].name, "DRUM KIT") && ENG_DRUM.presets[0].e[0] == DK_STD &&
          str_eq(ENG_DRUM.presets[1].name, "GATED 85") && ENG_DRUM.presets[1].e[0] == DK_77 &&
          str_eq(ENG_DRUM.presets[2].name, "808 NIGHT") && ENG_DRUM.presets[2].e[0] == DK_80 &&
          str_eq(ENG_DRUM.presets[3].name, "DRIVE KIT") && ENG_DRUM.presets[3].e[0] == DK_TIGHT &&
          str_eq(ENG_DRUM.presets[4].name, "NEON KIT") && ENG_DRUM.presets[4].e[0] == DK_DEEP &&
          str_eq(ENG_DRUM.presets[5].name, "PERC 84") && ENG_DRUM.presets[5].e[0] == DK_PERC;
-    for (k = 1; k < 6u; k++)
+    for (k = 1; k < 10u; k++)
         ok &= preset_cat(ENGI_DRUM, k) == CAT_DRUM;
     bad += check("  DRUM's presets: DRUM KIT first as before, then NEON's GATED 85 .. PERC 84 (category DRUM)", ok);
 

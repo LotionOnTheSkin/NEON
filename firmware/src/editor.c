@@ -472,7 +472,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(NSTEP);
         ed_b(P_E0);
         for (i = 0; i < NENGINES; i++)
-            ed_str(ENGINES[i]->name, 8);
+            ed_str(NEON_ONLY && !eng_ok(i) ? "-" : ENGINES[i]->name, 8);   /* (NEON: an unlisted engine "-", as a reserved one) */
         ed_b(NTRK);                                       /* v3 */
         ed_b(CHAIN_ROWS);                                  /* v6 */
         ed_b(0x55); ed_b(1); ed_b(ed_ui_caps());             /* tagged preferences v1: commands 34..38 */

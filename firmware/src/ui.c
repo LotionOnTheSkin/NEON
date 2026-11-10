@@ -1366,10 +1366,14 @@ static void fm4_load_preset(track_t *t, uint32_t k)
 
 static void set_engine_of(track_t *t, uint32_t ei);
 /* preset pi of the engine the track asked for: the sound only (not the steps, not param_kept) */
+/* NEON: the extras (preset_t.xp) the last preset loaded on each track set: the ones a load keeps (the arp, TRN: param_kept)
+ * go back to their defaults when the next sound loads, so an arp preset's arp does not stay under a pad */
+static const int16_t *xp_live[NTRK];
 static void apply_preset_to(track_t *t, uint32_t pi)
 {
     const engine_t *e = ENGINES[t->eng_req % NENGINES];
     uint32_t i;
+    const int16_t *q;
 #if !FELUCCA_FM4
     if (t->eng_req % NENGINES == ENGI_DIGITAL) {
         fm4_load_preset(t, pi);
@@ -1391,6 +1395,10 @@ static void apply_preset_to(track_t *t, uint32_t pi)
     }
     pi = preset_orig(e, pi % e->npresets);
     t->preset = (uint8_t)pi;
+    for (q = xp_live[trk_index(t) % NTRK]; q && *q >= 0; q += 2)   /* NEON: the last preset's kept extras undone */
+        if (*q < P_E0 && param_kept((uint32_t)*q))
+            t->p[*q] = TP[*q].def;
+    xp_live[trk_index(t) % NTRK] = e->presets[pi].xp;
     for (i = 0; i < P_E0; i++)                        /* the rest of the sound to its defaults: a preset */
         if (!param_kept(i))                           /* sounds the same after any edit */
             t->p[i] = TP[i].def;
@@ -1408,6 +1416,9 @@ static void apply_preset_to(track_t *t, uint32_t pi)
         for (i = 0; i < 4u; i++)
             t->p[P_DIST + i] = (int16_t)(pr->fx[i] ? pr->fx[i] - 1 : FX_DEF[i]);
     }
+    for (q = e->presets[pi].xp; q && *q >= 0; q += 2)  /* NEON: its extras: LFO, routings, glide, arp, TRN */
+        if (*q < P_E0)
+            t->p[*q] = (int16_t)clamp(q[1], TP[*q].min, TP[*q].max);
     fm6_track_loaded(t);                              /* FM6: the preset's patch (its SLOT) */
     load_end(t);
 }
@@ -1583,7 +1594,7 @@ static uint32_t preset_all_at(uint32_t n, uint32_t *k)
  * byte no engine uses (ui_lcat: 0 = none; firmware before reads ALL there, and favorites.filter stays 0 / 1 for it, the
  * editor and backups); the PRESETS knob and page browse that list */
 #define ui_lcat (favorites.factory[15][11])
-#define LIST_N (1u + CAT_N)                              /* ALL FAV BASS LEAD PAD PLUCK KEYS DRUM FX OTHER */
+#define LIST_N (NEON_ONLY ? 2u + CAT_DRUM : 1u + CAT_N)   /* ALL FAV BASS LEAD PAD PLUCK KEYS DRUM FX OTHER (NEON: .. DRUMS) */
 static uint32_t list_mode(void) { return favorites.filter ? 1u : ui_lcat && ui_lcat < CAT_N ? 1u + ui_lcat : 0u; }
 static void list_set(uint32_t m)
 {

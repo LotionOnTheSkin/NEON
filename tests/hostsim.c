@@ -28,6 +28,9 @@
 #undef memcpy
 #undef memcmp
 static struct { volatile uint32_t notes, buttons; } fm1_in;
+#ifndef NEON_ONLY
+#define NEON_ONLY 0                    /* the host tests list every engine (core.h); -DNEON_ONLY=1: the firmware's own list */
+#endif
 #include "../firmware/src/core.h"
 #include "../firmware/src/engines.c"
 #include "../firmware/src/params.c"

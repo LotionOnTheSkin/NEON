@@ -20,16 +20,14 @@ static int32_t graph_ht = 100;
 /* NEON role colours: each kind of sound its own neon, mixed into the palette's THEME (75 %) so every palette keeps
  * its character and contrast; GREY and MONO stay as they are (THEME). BASS cyan, PAD violet, LEAD hot pink, an arp
  * (PLUCK, KEYS) amber, a kit yellow; anything else THEME */
-static uint16_t role_col(const track_t *t)
+static uint16_t cat_col(uint32_t c)                  /* a section's (category.c CAT_*) colour */
 {
-    static const uint16_t RC[CAT_N] = {0, 0x073F, 0, 0xB27F, 0xFCE7, 0xFCE7, 0xFF09, 0, 0};
-    uint32_t c = drum_track(t) ? (uint32_t)CAT_DRUM : track_cat(t);
-    if (c == CAT_LEAD)
-        return ux.mono || ux.pal_i == UI_BW_INDEX ? T_THEME : ux_mix(T_THEME, 0xF9F4, 75);
+    static const uint16_t RC[CAT_N] = {0, 0x073F, 0xF9F4, 0xB27F, 0xFCE7, 0xFCE7, 0xFF09, 0, 0};
     if (ux.mono || ux.pal_i == UI_BW_INDEX || c >= CAT_N || !RC[c])
         return T_THEME;
     return ux_mix(T_THEME, RC[c], 75);
 }
+static uint16_t role_col(const track_t *t) { return cat_col(drum_track(t) ? (uint32_t)CAT_DRUM : track_cat(t)); }
 static void graph_adsr(const track_t *t, uint16_t c)
 {
     const page_t *pg = cur_page();
@@ -1386,7 +1384,8 @@ static const char *eng_abbr(const char *name)
                                        {"SAMPLE", "SMPL"}, {"VOICE", "VOCL"}, {"TRIO", "TRIO"}, {"WHEEL", "WHEL"},
                                        {"GRAIN", "GRAN"}, {"PHYS", "PHYS"}, {"DRUM", "DRUM"},
                                        {"NOISE", "NOIS"}, {"FM6", "FM6"}, {"SLICE", "SLCE"},
-                                       {"ADPCM", "ADPC"}, {"NEON", "NEON"}};
+                                       {"ADPCM", "ADPC"}, {"NEON", "NEON"}, {"JUNO", "JUNO"}, {"THUNDER", "THDR"},
+                                       {"STRINGS", "STRG"}};
     uint32_t i;
     for (i = 0; i < sizeof A / sizeof A[0]; i++)
         if (str_eq(name, A[i][0]))
@@ -1472,6 +1471,7 @@ static void graph_browse(void)
     for (row = -3; row <= 3; row++) {
         int32_t y = LIST_Y(row + 3), x1 = 212;
         char tag[6], nm[13], pt[4], pn[13];
+        uint16_t tagc = T_DIM;
         uint32_t index = preset_visible(cur, total, (uint32_t)(row + 3));
         int sel = index == cur;
         int32_t hint = sel ? preset_pat_hint() : -1;    /* the suggested pattern */
@@ -1483,12 +1483,19 @@ static void graph_browse(void)
         } else {
             str_cpy(tag, eng_abbr(ENGINES[e]->name), sizeof tag);
             str_cpy(nm, ENGINES[e]->presets[k].name, sizeof nm);
+#if NEON_ONLY                                           /* NEON: the row's tag is the sound's section, in its colour */
+            {
+                static const char *const SEC[CAT_N] = {"-", "BASS", "LEAD", "PAD", "ARP", "KEY", "DRUM", "FX", "-"};
+                str_cpy(tag, SEC[preset_cat(e, k) % CAT_N], sizeof tag);
+                tagc = cat_col(preset_cat(e, k));
+            }
+#endif
         }
         if (hint >= 0) {
             pat_label((uint32_t)hint, pt, pn);
             x1 = 206 - text_w(&AF_M, pt) - 6;
         }
-        list_row(y, sel, tag, T_DIM, nm, T_TEXT, x1);
+        list_row(y, sel, tag, tagc, nm, T_TEXT, x1);
         if (hint >= 0) {
             GFX_HOOK_ALIGN(0, y, 0, y + 16, AL_V, "list row text centred up/down");
             cv_text_r(206, y + LIST_TY, &AF_M, pt, T_INK, T_THEME);

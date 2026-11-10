@@ -7966,6 +7966,16 @@ static int test_knob_accel(void)
  * presets, one of them holding a pattern), on HOME and the PRESETS page, stopped and playing, on an empty track: no
  * step is written, the ARP stays off, nothing is held, the transport is not started, no message about a pattern. (In
  * 0.9 a preset carried a 16-step pattern and replaced the steps; since 1.0 only SEQ > PHRASES loads one.) */
+/* NEON: the arp a factory preset's extras set (preset_t.xp P_AMODE; 0: it sets none) */
+static int32_t xp_arp(const track_t *t)
+{
+    const engine_t *e = ENGINES[t->eng_req % NENGINES];
+    const int16_t *q = !t->user && t->preset < e->npresets ? e->presets[t->preset].xp : 0;
+    for (; q && *q >= 0; q += 2)
+        if (*q == P_AMODE)
+            return q[1];
+    return 0;
+}
 static int test_browse_no_pattern(void)
 {
     int bad = 0, ok = 1;
@@ -7986,7 +7996,7 @@ static int test_browse_no_pattern(void)
             turn(EN_PRESET, 1);
             loads++;
             pat_hints += preset_pat_hint() >= 0;
-            if (!seq_is_empty(t) || t->p[P_AMODE] || t->nheld || (!(pass & 1u) && (song.playing || transport_req))) {
+            if (!seq_is_empty(t) || t->p[P_AMODE] != xp_arp(t) || t->nheld ||   /* (NEON: an arp preset's own arp, gone with the next) */ (!(pass & 1u) && (song.playing || transport_req))) {
                 printf("  pass %u, sound %u (%s %u): steps %d ARP %d held %u playing %d\n", pass, n,
                        ENGINES[t->eng_req % NENGINES]->name, t->preset, !seq_is_empty(t), t->p[P_AMODE], t->nheld,
                        song.playing);

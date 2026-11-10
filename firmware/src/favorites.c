@@ -16,7 +16,15 @@ static favorites_t favorites __attribute__((section(".pool")));
 #define FAV_NEON_AT 240u
 static uint8_t *fav_bit(uint32_t engine, uint32_t preset, uint8_t *mask)   /* the byte and bit of a factory preset */
 {
-#if FELUCCA_NEON
+#if NEON_ONLY   /* NEON's engines in rows of unlisted ones: JUNO DIGITAL's (1), THUNDER PHASE's (2), STRINGS LOFI's (3), NEON VOICE's (5) */
+    if (engine >= 14u && engine <= 17u && preset < 256u) {
+        static const uint8_t ROW[4] = {1, 5, 2, 3};
+        *mask = (uint8_t)(1u << (preset % 8u));
+        return &favorites.factory[ROW[engine - 14u]][preset / 8u];
+    }
+    if (engine == 1u || engine == 2u || engine == 3u || engine == 5u)
+        return 0;
+#elif FELUCCA_NEON
     if (engine == ENGI_NEON && preset < 256u - FAV_NEON_AT) {
         *mask = (uint8_t)(1u << (preset % 8u));
         return &favorites.factory[13][(FAV_NEON_AT + preset) / 8u];

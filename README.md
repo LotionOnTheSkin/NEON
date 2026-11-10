@@ -35,6 +35,13 @@ analog drift (MOVE). Everything else is Felucca as it is upstream.
 - **Stereo chorus:** the chorus bus is a Juno's now: two taps swept against each other, one left, one right.
 - **Phrases:** SAVE > PHRASES adds DRIVE BS, PULSE 8, PAD BAR, STABS, ARP 16, LEAD 80, DRIVE BT (PAD BAR and STABS
   load triads in the track's scale).
+- **Six sections, NEON's own sounds:** PRESETS lists **BASS, LEAD, PAD, ARP, KEY, DRUMS** (KNOB 4 LIST), every row
+  tagged with its section in its colour. About 220 sounds: Neon Summers' 67 TAL U-NO-LX patches on JUNO, 113 Sylenth1
+  patches (his own and the Retro Thunder bank) on THUNDER, STRINGS, NEON and ten drum kits. They were carried over by
+  conversion tools from the preset files, so they are close relatives of the originals, not copies. Felucca's own
+  engines (ANALOG, FM6, SAMPLE ..) are no longer listed; they stay in the firmware so an older project still plays.
+- **Presets set more of the track:** a sound can carry its LFO, key tracking, glide, transposition and arp
+  (an ARP sound turns the arp on; the next sound loaded turns it off again).
 - **New engines:** **JUNO** (engine 14): a Juno-106 voice: PULS (0 off, then PWM depth), MODE (MAN, LFO rates, ENV),
   SAW, SUB | CUT, RES, HPF, NOIS. **THUNDER** (16): two oscillators in unison (A three voices, B two at INT), a wave pair,
   DET, MIX | CUT, RES, DRV, a 12 / 24 dB slope. **STRINGS** (17): a string machine: two footages, an ensemble (ENS, SPD),

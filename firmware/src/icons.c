@@ -256,6 +256,9 @@ static uint32_t engine_icon(const char *name)
         {"FM6", ICON_MOD},                    /* (symbol_modular: six operators patched; a glyph of its own wanted) */
         {"ADPCM", ICON_SAMPLE},               /* (short sampled waves) */
         {"NEON", ICON_WAVE},                  /* (saws, as ANALOG) */
+        {"JUNO", ICON_PULSE},                 /* (the DCO's pulse) */
+        {"THUNDER", ICON_TRIO},               /* (stacked oscillators) */
+        {"STRINGS", ICON_DRAWBAR},            /* (footages) */
     };
     uint32_t i;
     for (i = 0; i < sizeof M / sizeof M[0]; i++)

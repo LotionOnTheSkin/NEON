@@ -121,7 +121,10 @@ typedef struct {
     uint8_t pat;                 /* suggested pattern (PATTERNS[pat - 1], 0 = none): only a hint. A sound load
                                   * never touches the steps; SEQ > PATTERNS loads a pattern (ui.c pat_load). The
                                   * arp is the track's too: a preset does not set it */
+    const int16_t *xp;           /* NEON: more of the track for this sound: (parameter id, value) pairs, ended by -1
+                                  * (0: none): its LFO, routings, glide, arp, transposition (ui.c apply_preset_to) */
 } preset_t;
+#define XP(...) .xp = (const int16_t[]){__VA_ARGS__, -1}
 #define FX(d, c, dl, r) .fx = {(d) + 1, (c) + 1, (dl) + 1, (r) + 1}
 #define PAT(n) .pat = (n)
 

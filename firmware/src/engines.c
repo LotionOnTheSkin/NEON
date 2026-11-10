@@ -157,6 +157,9 @@ static const char *snd_missing(const track_t *t, uint32_t *code)
 /* the order the engines are shown in (PRESETS browsing and its ENG knob, the EDIT layer's keys, the editor's list):
  * engine indices, never DIGITAL's reserved 1 (with FELUCCA_FM4 it follows FM6). The indices stay as they are (the
  * stores and the protocol hold them); only this table orders them */
+#if NEON_ONLY
+static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {14, 16, 17, 15, 10};   /* JUNO THUNDER STRINGS NEON DRUM */
+#else
 static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
     0,                           /* ANALOG */
     12,                          /* FM6 */
@@ -181,12 +184,17 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
     15,                          /* NEON: last as ADPCM, picked with PRESETS' ENG knob (no EDIT key: INIT stays on E5) */
 #endif
 };
+#endif
 
 /* the engines one can pick (engine 1 only with FELUCCA_FM4), in ENGINE_ORDER: eng_ok(e), the n-th of them
  * eng_vis(n), e's place among them eng_rank(e), the next / previous one eng_step(e, dir) (wraps) */
 static int eng_ok(uint32_t e)
 {
+#if NEON_ONLY
+    return e == 14u || e == 15u || e == 16u || e == 17u || e == ENGI_DRUM;
+#else
     return e < NENGINES && (FELUCCA_FM4 || e != ENGI_DIGITAL) && (!ENG_RESERVED_14 || e != ENGI_ADPCM);
+#endif
 }
 static uint32_t eng_vis(uint32_t n) { return ENGINE_ORDER[n % NENG_SHOWN]; }
 static uint32_t eng_rank(uint32_t e)
@@ -264,6 +272,10 @@ static const struct {
 #define NPATTERNS (sizeof PATTERNS / sizeof PATTERNS[0])
 
 /* the parts at power-on (engine, preset, PATTERNS[n - 1] in the sequencer, 0 = empty: all are): bass, pad, lead, drums */
+#if NEON_ONLY   /* JUNO MIAMI 2K15 (a bass), JUNO WE TRUST (a pad), THUNDER DBL IMPACT (a lead), DRUM GATED 85 */
+static const uint8_t TRK_DEF[NPART][3] = {{14, 59, 0}, {14, 12, 0}, {16, 25, 0}, {ENGI_DRUM, 1, 0}};
+#else
 static const uint8_t TRK_DEF[NPART][3] = {{0, 4, 0}, {ENGI_FM6, 4, 0}, {3, 0, 0}, {ENGI_DRUM, 0, 0}}; /* ANALOG ACID,
                                                                        * FM6 PAD (was DIGITAL PAD), LOFI PULSE LD, DRUM KIT */
+#endif
 static uint32_t trk_def_engine(uint32_t i) { return TRK_DEF[i % NPART][0]; }
