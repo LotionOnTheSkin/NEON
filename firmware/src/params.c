@@ -81,10 +81,10 @@ static const char *const N_ENGNAME[] = {"ANALOG", FELUCCA_FM4 ? "DIGITAL" : "-",
 #if FELUCCA_ADPCM
                                              "ADPCM",
 #elif FELUCCA_NEON
-                                             "-",       /* 14: reserved for ADPCM (engines.c ENG_RESERVED) */
+                                             "JUNO",    /* 14: JUNO when ADPCM is not built (engines.c) */
 #endif
 #if FELUCCA_NEON
-                                             "NEON",
+                                             "NEON", "THUNDER", "STRINGS",
 #endif
 };
 typedef char engname_fits[sizeof N_ENGNAME / sizeof N_ENGNAME[0] == NENGINES ? 1 : -1];   /* one name an engine number */
@@ -376,6 +376,11 @@ static void param_format(const param_desc_t *d, int32_t v, char *val, const char
     }
     case F_LFOHZ: {
         uint32_t h = LFO_HZ_X100[v & 127];
+        if (d->names && (!v || (v == d->max && d->names[1]))) {   /* a rate whose 0 (and top) has a name: MAN, ENV */
+            str_cpy(val, d->names[v ? 1 : 0], 12);
+            *unit = "";
+            break;
+        }
         if (h < 1000u)
             fmt_fix(val, (int32_t)h, 2);
         else

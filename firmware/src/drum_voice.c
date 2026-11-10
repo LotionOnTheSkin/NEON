@@ -76,7 +76,7 @@ enum {
 };
 /* a lane of a model kit as a type: the kit (1..DV_NKIT) in the high 4 bits, the lane in the low 3 (Felucca's own
  * types: 0 above). Its run (the DVT_* it plays through) is the kit's (DV_KIT) */
-#define DV_NKIT 8                                        /* (1.5.6, #216: DEEP TIGHT PERC after 77) */
+#define DV_NKIT 12                                       /* (1.5.6, #216: DEEP TIGHT PERC after 77; NEON: LINN DMX GATE SIMM) */
 #define DV_KITOF(t) ((uint32_t)(t) >> 4)
 #define DV_KTYPE(kit, lane) ((uint8_t)(((kit) << 4) | (lane)))
 
@@ -187,7 +187,11 @@ typedef struct {
     int16_t v[13];
 } dv_kit_t;
 /* the accent per kit: + (x / 16384) per accent step (75: +4 dB at full, as Felucca's own) */
-static const uint8_t DV_KIT_ACC[DV_NKIT] = {120, 45, 100, 40, 40, 80, 60, 70};
+static const uint8_t DV_KIT_ACC[DV_NKIT] = {120, 45, 100, 40, 40, 80, 60, 70, 90, 90, 100, 80};
+/* NEON: the snare's gate per kit (blocks; 0: none): the tail holds on its own decay, then closes in ~6 ms, as the
+ * gated reverb on an 80s snare does */
+#define DV_MS(ms) ((uint16_t)((ms) * (FS / 1000) / CTL))
+static const uint16_t DV_KIT_SGATE[DV_NKIT] = {0, 0, 0, 0, 0, 0, 0, 0, 0, DV_MS(180), DV_MS(300), DV_MS(220)};
 static const dv_kit_t DV_KIT[DV_NKIT][DV_NLANE] = {
     {   /* 80 */
         /* deep sine, a small drop, long decay */
@@ -329,6 +333,46 @@ static const dv_kit_t DV_KIT[DV_NKIT][DV_NLANE] = {
         {DVT_CLAVE, 32, 1568, 149, 2131, {84, 28000, 10000, 6348, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
         /* 66's bell: sines 830 / 613 Hz */
         {DVT_RIM, 40, 1280, 60, 3629, {-84, 30000, 7500, 4096, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+    },
+    {   /* LINN (NEON): a tight sampled-style kit: a punchy kick, a fat snare, claps, crisp hats, bent toms, a cowbell */
+        {DVT_PUNCH, 60, 531, 160, 3485, {130, 100, 0, 1600, 0, 1444, 2200, 6500, 0, 0, 0, 0, 0}},
+        {DVT_SNARE, 40, 919, 330, 3313, {0, 0, 100, 37, 0, 22000, 1620, 9000, 25, 32767, 18000, 0, 1828}},
+        {DVT_CLAP, 48, 1393, 281, 8368, {0, 6302, 1585, 1500, 8000, 30000, 52, 322, 6, 0, 0, 0, 0}},
+        {DVT_HATC, 45, 1909, 94, 2473, {1996, 5120, 1940, 2042, 4000, 11469, 18022, 3, 3, 0, 0, 0, 0}},
+        {DVT_HATO, 63, 1909, 600, 1366, {1996, 5120, 1940, 2042, 4000, 11469, 18022, 3, 3, 0, 0, 0, 0}},
+        {DVT_TOM, 53, 797, 450, 2858, {28, 180, 1523, 2500, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_RIM, 32, 1113, 12, 4599, {360, 12000, 30000, 32000, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_BELL, 50, 1161, 252, 2697, {109, 129, 3413, 30000, 45, 0, 0, 0, 0, 0, 0, 0, 0}},
+    },
+    {   /* DMX (NEON): boomier: a long sine kick with a click, a bright snare, 80's claps and hats, a low tom, a crash */
+        {DVT_PUNCH, 64, 499, 260, 3124, {60, 150, 0, 300, 0, 1444, 2600, 4800, 0, 0, 0, 0, 0}},
+        {DVT_SNARE, 40, 845, 200, 4318, {241, 0, 100, 53, 32767, 11000, 1700, 6827, 30, 16000, 32767, 0, 1828}},
+        {DVT_CLAP, 48, 1331, 316, 13485, {0, 4096, 1678, 0, 2000, 30000, 35, 441, 3, 0, 0, 0, 0}},
+        {DVT_HATC, 45, 893, 60, 9017, {1874, 5120, 2020, 2042, 7209, 32767, 0, 3, 0, 0, 0, 0, 0}},
+        {DVT_HATO, 63, 893, 400, 11471, {1874, 5120, 1934, 2042, 1147, 32767, 0, 3, 0, 0, 0, 0, 0}},
+        {DVT_TOM, 53, 824, 300, 3175, {21, 600, 1523, 9000, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_RIM, 32, 1441, 13, 8636, {304, 26000, 1000, 4096, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_CYM, 53, 1014, 3773, 10841, {1766, 3413, 1729, 3413, 16384, 20000, 60, 19661, 0, 2, 0, 0, 0}},
+    },
+    {   /* GATE (NEON): the big 80s room: a swelling kick, a gated snare (300 ms then shut), huge bent toms */
+        {DVT_PUNCH, 60, 579, 337, 2590, {26, 450, 0, 1500, 520, 1478, 1800, 5000, 30, 0, 0, 0, 0}},
+        {DVT_SNARE, 40, 900, 1400, 2372, {0, 0, 100, 18, 0, 20000, 1560, 9500, 25, 32767, 22000, 0, 1828}},
+        {DVT_CLAP, 48, 1393, 600, 8368, {0, 6302, 1585, 1500, 8000, 30000, 52, 322, 6, 0, 0, 0, 0}},
+        {DVT_HATC, 45, 1690, 300, 3359, {1828, 8192, 1596, 2042, 0, 29491, 0, 3, 5, 0, 0, 0, 0}},
+        {DVT_HATO, 63, 1690, 1188, 2748, {1828, 8192, 1596, 2042, 0, 29491, 0, 3, 5, 0, 0, 0, 0}},
+        {DVT_TOM, 53, 760, 900, 2095, {60, 300, 1523, 2500, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_RIM, 32, 1113, 12, 4599, {360, 12000, 30000, 32000, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_CYM, 53, 1014, 3773, 10841, {1766, 3413, 1729, 3413, 16384, 20000, 60, 19661, 0, 2, 0, 0, 0}},
+    },
+    {   /* SIMM (NEON): the hexagonal pads: a swept kick, a gated electronic snare, toms that dive an octave */
+        {DVT_PUNCH, 60, 561, 300, 2662, {160, 220, 0, 0, 0, 1233, 2600, 4096, 0, 0, 0, 0, 0}},
+        {DVT_SNARE, 40, 979, 900, 3520, {107, 120, 400, 60, 6000, 4000, 1880, 8192, 30, 16000, 32767, 32767, 1828}},
+        {DVT_CLAP, 48, 1331, 316, 13485, {0, 4096, 1678, 0, 2000, 30000, 35, 441, 3, 0, 0, 0, 0}},
+        {DVT_HATC, 45, 1907, 225, 4594, {1907, 1024, 1870, 2042, 0, 0, 7000, 3, 6, 0, 0, 0, 0}},
+        {DVT_HATO, 63, 1907, 600, 3839, {1907, 1024, 1870, 2042, 0, 0, 7000, 3, 6, 0, 0, 0, 0}},
+        {DVT_TOM, 53, 840, 700, 2244, {190, 900, 1523, 600, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_RIM, 32, 1441, 13, 8636, {304, 26000, 1000, 4096, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        {DVT_BELL, 50, 1161, 252, 2697, {109, 129, 3413, 30000, 45, 0, 0, 0, 0, 0, 0, 0, 0}},
     },
 };
 
@@ -571,6 +615,10 @@ static void dv_setup_kit(dv_coef_t *c, const dv_param_t *p)
         c->g[2] = dv_at(v[10], x);
         c->g[3] = v[9] + ((v[9] * acc) >> 8);
         c->g[4] = v[11];
+        if (DV_KIT_SGATE[kit]) {                         /* NEON: the gate, longer or shorter with DECAY */
+            c->hold = (uint16_t)(DV_KIT_SGATE[kit] * (d + 64u) / 128u);
+            c->kb[1] = dv_kb(60);                        /* it shuts in ~6 ms */
+        }
         break;
     case DVT_CLAP:
         tsvf_coef_k(&c->f[0], dv_cut(p16 + ((int32_t)tn - 64) * 2), v[1]);
@@ -729,7 +777,16 @@ static __attribute__((noinline)) void dv_snare_run(const dv_coef_t *c, dv_voice_
 {
     uint32_t i, p0 = v->ph[0], p1 = v->ph[1], eg = v->e[0], es = v->e[1], ek = v->e[2], gs = c->span[0] >> 16;
     int32_t a, d, lp = v->s[2];
-    dv_slow(&v->q[0], c->kb[0], &a, &d);
+    uint32_t kb = c->kb[0];
+    if (c->hold) {                                       /* NEON: a gated snare: open while cnt, then shut */
+        if (v->cnt)
+            v->cnt--;
+        else {
+            kb = c->kb[1];
+            es = (es * 3u) >> 2;                         /* (the shell with it) */
+        }
+    }
+    dv_slow(&v->q[0], kb, &a, &d);
     for (i = 0; i < n; i++) {
         uint32_t inc = c->inc[0] + gs * eg;
         int32_t sh, nz = DV_NOISE(v), bp, hp, x;
@@ -916,6 +973,9 @@ static void dv_strike(const dv_coef_t *c, dv_voice_t *v)
         v->cnt = c->hold;
         v->n = c->click;
         v->e[2] = c->k[2] ? 65536u : 0;                  /* the rise, if any */
+        break;
+    case DVT_SNARE:
+        v->cnt = c->hold;                                /* NEON: the gate's length (0: none) */
         break;
     case DVT_CLAP:
         v->q[0] = 0;

@@ -806,7 +806,7 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_MESSAGE_NOFILE, S_PRESET
        S_DETAIL_COND, S_DETAIL_FILL, S_AUTO_COND, S_GLO_FILL, S_SEQ_EUCLID, S_SEQ_EUCLID_DRUM, S_SEQ_EUCLID_64,
        S_MENU_SELECT, S_PROJECT_ERASE, S_CONFIRM_ERASE_PROJ, S_TOOLS_CLEAN, S_CONFIRM_CLEAN,
        S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD,
-       S_DRIVE, S_DRIVE_PLAYING, S_PROG, S_PROG_PLAYING, S_COUNT };   /* (NEON: SUNSET DRIVE, stopped and playing; HARMONY) */
+       S_DRIVE, S_DRIVE_PLAYING, S_PROG, S_PROG_PLAYING, S_ROLL_HARMONY, S_COUNT };   /* (NEON: SUNSET DRIVE, stopped and playing; HARMONY) */
 static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "message_key", "message_nofile", "presets", "presets_nofav", "user",
     "phrases", "project", "tools", "song_empty", "song", "step", "auto_steps", "auto_add_chance", "automation", "drum",
     "drum_hand", "drum_cym", "mixer", "mixer_from_home", "mixer_pan", "env", "env_dest", "lfo", "mod", "fx", "slicer", "dly", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
@@ -838,7 +838,7 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "mes
     "layer_seq_euclid_64",
     "menu_select", "project_erase", "confirm_erase_project", "tools_clean", "confirm_clean",
     "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold",
-    "drive", "drive_playing", "prog", "prog_playing"};
+    "drive", "drive_playing", "prog", "prog_playing", "roll_harmony"};
 
 /* the STEP page's piano roll (ui_graph.c graph_roll) on track 1, stopped unless said: an empty pattern; ACID in
  * A minor; POLY chords (Am7 F C G, tied); a line with ties, slides and accents in C major; LEN 32 on its second
@@ -1266,6 +1266,13 @@ static void setup(int s)
     case S_PROG_PLAYING:                              /* .. NIGHT playing its third bar, SLOT on the "+" */
         prog_set_mood(MOOD_NIGHT); TSEL->p[P_SCALE] = 2; song.prog_cur = 4; song.playing = 1; prog_bar = 2;
         go_title("PROG"); break;
+    case S_ROLL_HARMONY:                              /* NEON: a PROG track's WRITE (PAD PULSE) on the roll, DRIVE playing VI:
+                                                       * the chord lane (C's triad lit), "C MIN  VI" */
+        prog_set_mood(MOOD_DRIVE); TSEL->p[P_SCALE] = 2; TSEL->p[P_ROOT] = 0; song.sel = 0;
+        wr_next[0] = 1; TSEL->p[P_QUANT] = QN_PROG;
+        { track_t *w = TSEL; uint32_t k; for (k = 0; k < NSTEP; k++) step_clear(&w->step[k]); wr_pad(w, 1); w->p[P_SLEN] = 16; }
+        go_page(GR_ROLL); song.playing = 1; prog_bar = 1; prog_deg = 5; ui.cursor = 0;
+        break;
     case S_DRIVE_PLAYING:                             /* .. playing a third into the beat, every track sounding */
         go_title("DRIVE"); song.playing = 1; beat_pos = beat_samples() / 3u;
         { uint32_t k; for (k = 0; k < NTRK; k++) trk[k].peak = 6000 + (int32_t)k * 6000; }

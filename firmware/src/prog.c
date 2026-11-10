@@ -115,6 +115,33 @@ static __attribute__((noinline)) int32_t prog_follow(const track_t *t, int32_t n
     n = snap_mask(n, mask, r);
     return deg_move(n, d, mask, r);
 }
+/* a chord step of a PROG track (3 or 4 notes, written on the tonic): each note to the nearest tone of the chord now
+ * playing, no two on the same, so a pad moves by the smallest steps (the common tones stay) instead of every voice
+ * sliding up or down together: voice leading, inversions on their own. out: the notes, as many as in */
+static __attribute__((noinline)) void prog_voice(const track_t *t, const uint8_t *in, uint32_t n, int32_t add,
+                                                 int32_t *out)
+{
+    uint32_t mask = prog_mask(t), k, j, nt = n >= 4u ? 4u : 3u;
+    int32_t r = t->p[P_ROOT], d = prog_deg, base, pc[4];
+    base = deg_move(r + 60, d, mask, r);
+    for (j = 0; j < nt; j++)
+        pc[j] = deg_move(base, (int32_t)(2u * j), mask, r) % 12;
+    for (k = 0; k < n && k < 4u; k++) {
+        int32_t x = snap_mask((int32_t)in[k] + add + (r > 6 ? r - 12 : r), mask, r), best = x, bd = 99;
+        for (j = 0; j < nt; j++) {
+            int32_t c = x + ((pc[j] - x % 12 + 18) % 12) - 6, dd, m;   /* the nearest with that pitch class: -6..+5 */
+            uint32_t used = 0;
+            for (m = 0; m < (int32_t)k; m++)
+                used |= out[m] == c;
+            dd = c > x ? c - x : x - c;
+            if (!used && dd < bd) {
+                bd = dd;
+                best = c;
+            }
+        }
+        out[k] = best;
+    }
+}
 /* the triad's quality of degree d in the track's scale: 0 major, 1 minor, 2 diminished, 3 augmented / other */
 static uint32_t prog_quality(const track_t *t, uint32_t d)
 {

@@ -1011,6 +1011,7 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
     uint32_t qseq = t->p[P_QUANT] >= QN_SEQ && !(e->keys && e->keys(t, 0) >= 0);
     int32_t qtrn = qseq && t->p[P_QUANT] >= QN_SEQT ? t->p[P_TRANS] : 0;
     uint32_t qprog = qseq && t->p[P_QUANT] == QN_PROG;
+    int32_t vl[4] = {0, 0, 0, 0};                   /* NEON: a chord step's notes, voice-led (prog_voice) */
     if (!(skip & SEQ_REP)) {
         t->rat_left = 0;
         if ((skip & SEQ_MISS) || (!(skip & SEQ_ROLLED) && seq_miss(t, s, idx))) {
@@ -1034,11 +1035,13 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
         if (!(skip & SEQ_REP))
             t->rat_left = (uint8_t)(hits - 1u);
     }
+    if (qprog && s->n >= 3u)                        /* NEON: a chord follows by voice leading (prog.c prog_voice) */
+        prog_voice(t, s->note, s->n, (int32_t)qtrn, vl);
     for (i = 0; i < s->n && i < 4u; i++) {
         uint32_t x = s->note[i];
         if (qseq) {                                 /* QNT SEQ: onto the scale now; two notes snapping */
-            x = (uint32_t)clamp(qprog ? prog_follow(t, (int32_t)x + qtrn)    /* together play once */
-                                      : scale_snap(t, (int32_t)x + qtrn), 0, 127);
+            x = (uint32_t)clamp(qprog ? (s->n >= 3u ? vl[i] : prog_follow(t, (int32_t)x + qtrn))   /* together */
+                                      : scale_snap(t, (int32_t)x + qtrn), 0, 127);                   /* play once */
             for (j = 0; j < m && nn[j] != x; j++)
                 ;
             if (j < m)

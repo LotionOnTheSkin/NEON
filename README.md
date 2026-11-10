@@ -35,13 +35,26 @@ analog drift (MOVE). Everything else is Felucca as it is upstream.
 - **Stereo chorus:** the chorus bus is a Juno's now: two taps swept against each other, one left, one right.
 - **Phrases:** SAVE > PHRASES adds DRIVE BS, PULSE 8, PAD BAR, STABS, ARP 16, LEAD 80, DRIVE BT (PAD BAR and STABS
   load triads in the track's scale).
+- **New engines:** **JUNO** (engine 14): a Juno-106 voice: PULS (0 off, then PWM depth), MODE (MAN, LFO rates, ENV),
+  SAW, SUB | CUT, RES, HPF, NOIS. **THUNDER** (16): two oscillators in unison (A three voices, B two at INT), a wave pair,
+  DET, MIX | CUT, RES, DRV, a 12 / 24 dB slope. **STRINGS** (17): a string machine: two footages, an ensemble (ENS, SPD),
+  BAL | CUT, HPF, AIR, KTR. Picked with PRESETS' ENG knob.
+- **80s drum kits:** DRUM's KIT adds **LINN**, **DMX**, **GATE** and **SIMM**; DMX, GATE and SIMM have a gated snare
+  (the tail holds, then shuts: 180, 300, 220 ms, longer or shorter with DECAY).
+- **WRITE and VARY** (hold SEQ: TOOLS): **F5 WRITE** writes a one-bar part for the track's sound (a bass line, pad chords,
+  an arp, a lead, a beat) on QNT PROG, so it plays the whole progression; press again for the next style (four a role).
+  **G5 VARY** makes a bar a 4-bar phrase: A, an answer, A, and a resolution (a kit: a tom fill).
+- **Voice leading:** a chord step on a PROG track moves each note to the nearest tone of the chord in play (the common
+  tones stay), instead of the whole chord sliding.
+- **Chord lane and role colours:** on STEP the piano roll lights the chord's rows and names the chord ("C MIN  VI");
+  each kind of sound has its colour (bass cyan, pad violet, lead pink, arp amber, kit yellow; GREY and MONO stay plain).
 - **The engine:** `firmware/src/eng_neon.c` (MIT). WAVE (SUPER / PWM / SUB / JUNO), SPRD, BLND, MOVE, CUT, RES, WARM,
   KTR. JUNO is one Juno-60 DCO: pulse with LFO PWM, saw, a locked sub; its knobs read SUB, SAW, PWM and RATE.
 - **Status:** experimental. It passes Felucca's host test suite; it has not yet been played on a real FM-1. Its CPU
   cost was estimated on a computer (about 2 to 2.5 ANALOG voices a voice), so it is capped at 6 voices.
 
-Engine numbers: NEON is engine 15; 14 stays reserved for Felucca's ADPCM, so projects move between this firmware and
-upstream Felucca without a mismatch. A project or user preset with a NEON sound does not load on upstream Felucca.
+Engine numbers: NEON is engine 15, JUNO 14 (Felucca's ADPCM slot, not built here), THUNDER 16, STRINGS 17. A project or
+user preset with one of these sounds does not load on upstream Felucca.
 
 ---
 

@@ -49,6 +49,13 @@ static uint8_t eng_mem_owner[NPART];       /* engine index + 1 whose state is in
 #endif
 #if FELUCCA_NEON
 #include "eng_neon.c"            /* NEON: synthwave voices (MIT) */
+#if FELUCCA_NEON && !FELUCCA_ADPCM
+#include "eng_juno.c"            /* JUNO: a Juno-106 voice (MIT) */
+#endif
+#if FELUCCA_NEON
+#include "eng_thunder.c"         /* THUNDER: a two-oscillator unison voice (MIT) */
+#include "eng_ensemble.c"        /* ENSEMBLE: a string machine (MIT) */
+#endif
 #endif
 #if ENG_RESERVED_14
 /* engine 14 in a NEON build without ADPCM: held for ADPCM, so the numbers stay those of every Felucca build. Never
@@ -95,10 +102,12 @@ static const engine_t *const ENGINES[NENGINES] = {
 #if FELUCCA_ADPCM
     &ENG_ADPCM,                  /* 14 (ENGI_ADPCM; FELUCCA_ADPCM=0 builds without it) */
 #elif FELUCCA_NEON
-    &ENG_RESERVED,               /* 14: reserved for ADPCM (not built): never offered (eng_ok) */
+    &ENG_JUNO,                   /* 14: JUNO (eng_juno.c), when ADPCM is not built */
 #endif
 #if FELUCCA_NEON
     &ENG_NEON,                   /* 15 (ENGI_NEON) */
+    &ENG_THUNDER,                /* 16 (ENGI_THUNDER) */
+    &ENG_ENSEMBLE,               /* 17 (ENGI_ENSEMBLE) */
 #endif
 };
 
@@ -163,7 +172,12 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
 #if FELUCCA_ADPCM
     14,                          /* ADPCM (1.8): last, so the EDIT layer's white keys keep the 13 above (ui_layer.c LY_ENG_KEYS) */
 #endif
+#if FELUCCA_NEON && !FELUCCA_ADPCM
+    14,                          /* JUNO */
+#endif
 #if FELUCCA_NEON
+    16,                          /* THUNDER */
+    17,                          /* ENSEMBLE */
     15,                          /* NEON: last as ADPCM, picked with PRESETS' ENG knob (no EDIT key: INIT stays on E5) */
 #endif
 };

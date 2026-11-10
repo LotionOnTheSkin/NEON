@@ -17,6 +17,19 @@ static int32_t graph_ht = 100;
 /* Matches voice.c: attack is linear, decay and release are exponential
  * (env += (target - env) * k each tick, ~99 % after the set time). Time
  * axis is the parameter value (the times themselves are exponential). */
+/* NEON role colours: each kind of sound its own neon, mixed into the palette's THEME (75 %) so every palette keeps
+ * its character and contrast; GREY and MONO stay as they are (THEME). BASS cyan, PAD violet, LEAD hot pink, an arp
+ * (PLUCK, KEYS) amber, a kit yellow; anything else THEME */
+static uint16_t role_col(const track_t *t)
+{
+    static const uint16_t RC[CAT_N] = {0, 0x073F, 0, 0xB27F, 0xFCE7, 0xFCE7, 0xFF09, 0, 0};
+    uint32_t c = drum_track(t) ? (uint32_t)CAT_DRUM : track_cat(t);
+    if (c == CAT_LEAD)
+        return ux.mono || ux.pal_i == UI_BW_INDEX ? T_THEME : ux_mix(T_THEME, 0xF9F4, 75);
+    if (ux.mono || ux.pal_i == UI_BW_INDEX || c >= CAT_N || !RC[c])
+        return T_THEME;
+    return ux_mix(T_THEME, RC[c], 75);
+}
 static void graph_adsr(const track_t *t, uint16_t c)
 {
     const page_t *pg = cur_page();
@@ -192,11 +205,38 @@ static void pr_bars(const step_t *st, int32_t x, int32_t w, uint16_t c, int acc_
             pr_split(x, y + 1, w, PR_RH - 2, c, hits);
     }
 }
+/* NEON chord lane: the chord of the roll's bar (HARMONY, prog.c): playing, the one in play; else the bar shown's
+ * (bar b of the progression). 7: none (no progression) */
+static uint32_t pr_chord(void)
+{
+    uint32_t n = prog_len();
+    if (!n)
+        return 7u;
+    return song.playing ? prog_deg : song.prog[prog_at(ui.bank)];
+}
+/* the pitch classes of its triad as the roll's rows should show them (bit pc): a PROG track writes on the tonic (in
+ * C, prog.c), so its chord rows are C's triad whatever plays; any other track the chord itself, in its key */
+static uint32_t pr_chord_pcs(const track_t *t)
+{
+    uint32_t d = pr_chord(), mask = prog_mask(t), m = 0, k;
+    int32_t r = t->p[P_ROOT], b;
+    if (d >= 7u)
+        return 0;
+    if (t->p[P_QUANT] == QN_PROG) {
+        d = 0;
+        r = 0;
+    }
+    b = deg_move(r + 60, (int32_t)d, mask, r);
+    for (k = 0; k < 3u; k++)
+        m |= 1u << (uint32_t)(deg_move(b, (int32_t)(2u * k), mask, r) % 12);
+    return m;
+}
 static void graph_roll(const track_t *t, uint16_t c)
 {
     uint32_t i, len = (uint32_t)t->p[P_SLEN], base = ui.bank * 16u, ncol, mask = scale_mask(t), held = pr_held();
     uint64_t locks = motion_lock_steps(trk_index(t));
     int32_t r, ybot = PR_Y0 + PR_ROWS * PR_RH, gw;
+    uint32_t cpc = pr_chord_pcs(t);                   /* NEON: the chord's rows, brighter than the scale's */
     char nb[8];
     ncol = base < len ? (len - base < 16u ? len - base : 16u) : 0u;
     gw = (int32_t)ncol * PR_CW + 1;
@@ -204,7 +244,9 @@ static void graph_roll(const track_t *t, uint16_t c)
         int32_t n = (int32_t)proll.lo + PR_ROWS - 1 - r, y = PR_Y0 + r * PR_RH;
         uint32_t pc = (uint32_t)n % 12u;
         int in = mask == 0xFFFu ? !KEY_BLACK[pc] : (int)((mask >> ((uint32_t)(n - t->p[P_ROOT] + 120) % 12u)) & 1u);
-        if (in)
+        if ((cpc >> pc) & 1u)                         /* (the role colour, faint: the chord's own rows) */
+            cv_rect(PR_X0, y, gw, PR_RH, ux.mono || ux.pal_i == UI_BW_INDEX ? T_RAISE : ux_mix(T_SURF, c, 24));
+        else if (in)
             cv_rect(PR_X0, y, gw, PR_RH, T_LANE);
         if ((held >> r) & 1u)
             cv_rect(PR_KX, y, 9, PR_RH - 1, T_ACCENT);
@@ -1226,6 +1268,12 @@ static void page_title(char *ti)
         str_cpy(ti, N_NOTE[(uint32_t)t->p[P_ROOT] % 12u], 4);
         str_cpy(ti + str_len(ti), " ", 4);
         str_cpy(ti + str_len(ti), N_SCALE[clamp(t->p[P_SCALE], 0, (int32_t)(sizeof N_SCALE / sizeof N_SCALE[0]) - 1)], 8);
+        if (pr_chord() < 7u) {                         /* NEON: the bar's chord ("A MIN  VI"), its rows lit */
+            char rn[6];
+            prog_roman(rn, t, pr_chord());
+            str_cpy(ti + str_len(ti), "  ", 4);
+            str_cpy(ti + str_len(ti), rn, 6);
+        }
     }
 }
 /* the strip's title: L centred (M when L lacks a glyph or is too wide) */
@@ -1263,6 +1311,8 @@ static uint32_t graph_signature(void)
         h ^= (uint32_t)t->p[P_ROOT] * 131u + (uint32_t)t->p[P_SCALE] * 1031u;
         h ^= song.playing ? (prog_at(prog_bar) + 1u) * 1299709u : 0u;
     }
+    if (pg->graph == GR_ROLL)                        /* NEON chord lane: the chord shown, its rows */
+        h ^= (pr_chord() + 1u) * 2654435761u + (uint32_t)t->p[P_QUANT] * 40503u;
     if (pg->graph == GR_CHORD) {                     /* the last chord played */
         h = (h ^ (chord_last[song.sel].root + 131u * chord_last[song.sel].mask)) * 16777619u;
         for (i = 0; i < CHORD_MAX; i++)
@@ -1769,7 +1819,7 @@ static void draw_tracks(void)
         uint32_t hot = sel && ui.hot_t ? ui.hot_col + 1u : 0u;   /* the knob just turned (hot_col + 1): 1 LEVEL, 2 PAN,
                                                                 * 3 REV, 4 MUTE (its badge) */
         int32_t pk = t->peak, m, pan = clamp(t->p[P_PAN], -64, 63), rv = clamp(t->p[P_REV], 0, 127);
-        uint16_t vc = mute ? T_DIM : T_THEME;
+        uint16_t vc = mute ? T_DIM : role_col(t);    /* NEON: its role colour */
         char b[16];
         t->peak = 0;
         trk_short_name(c, b);
@@ -2419,7 +2469,7 @@ static void draw_graph(void)
 {
     const page_t *pg = cur_page();
     const track_t *t = TSEL;
-    uint16_t c = ACC;
+    uint16_t c = role_col(t);                        /* NEON: the track's role colour (ACC on GREY / MONO) */
     uint32_t sig;
     if (drive_on()) {                                /* NEON: SUNSET DRIVE */
         draw_drive();

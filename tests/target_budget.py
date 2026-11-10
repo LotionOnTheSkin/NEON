@@ -36,7 +36,7 @@ FUNCS = ["analog_render", "digital_render", "digital_render_legacy", "digital_re
          "neon_render",                                     # NEON (eng_neon.c): SUPER / PWM / SUB / JUNO voices
          "cho_bus", "cho_side_mix",                         # NEON: the stereo chorus bus (fx.c), out of the ISR's loops
          "sl_pump",                                         # NEON: the SLICER's PUMP (slicer.c), while a track pumps
-         "prog_block", "prog_follow"]                       # NEON HARMONY (prog.c): once a block; a PROG note
+         "prog_block", "prog_follow", "prog_voice"]                       # NEON HARMONY (prog.c): once a block; a PROG note
 # built only with FELUCCA_FM4=1 (DIGITAL, src/eng_digital.c; not in the default build, so not in BUDGET): absent,
 # they are skipped; present, checked against these (their budget lines until the engine was retired in 1.0)
 OPTIONAL = {"digital_render": 12, "digital_render_legacy": 333, "digital_render_custom": 558,

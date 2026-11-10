@@ -75,7 +75,9 @@ static const page_t *ly_page(uint32_t l) { return l == LAYER_SCL ? &LY_SCL : l =
 #define LY_OPEN 2u                     /* ui.ly_t0: the map opened (no tap any more) */
 #define LY_COMBO 4u                    /* .. by a combo */
 #define LY_DEAD 8u                     /* .. pressed where there is no layer: does nothing */
-#define LY_ENG_KEYS ((uint32_t)(NENG_SHOWN - FELUCCA_ADPCM - FELUCCA_NEON))   /* EDIT: white keys for the engines before ADPCM (1.8: last
+#define LY_ENG_N ((uint32_t)(NENG_SHOWN - FELUCCA_ADPCM - FELUCCA_NEON))
+/* NEON: at most 13 (14 with FELUCCA_FM4); the engines past them (JUNO THUNDER STRINGS NEON ..): PRESETS' ENG knob */
+#define LY_ENG_KEYS (LY_ENG_N < 13u + FELUCCA_FM4 ? LY_ENG_N : 13u + FELUCCA_FM4)   /* EDIT: white keys for the engines before ADPCM (1.8: last
                                         * in engines.c ENGINE_ORDER, picked with PRESETS' ENG knob), so INIT and CLEAN INIT
                                         * stay where they were: 13 engines from F3, INIT E5 (14 and F5 with FELUCCA_FM4) */
 #define LY_INIT LY_ENG_KEYS            /* .. INIT, the white key after them */
@@ -1077,9 +1079,10 @@ static void layer_edit(void)                            /* the engines from F3, 
  * track the lanes of black keys 1..8 under them (the selected one: the selection's fill). A melodic track: the two
  * rows of the sequence's tools only */
 static const uint8_t TL_ICON[TL_N] = {ICON_CLEAR, ICON_X_REVERSE, ICON_X_LEFT, ICON_X_RIGHT, ICON_PROB, ICON_W_SH,
-    ICON_DRUM, ICON_PULSE, ICON_CLEAR, ICON_X_REVERSE, ICON_STEPS, ICON_PROB, ICON_LENGTH, ICON_DIVISION};
+    ICON_DRUM, ICON_PULSE, ICON_CLEAR, ICON_X_REVERSE, ICON_STEPS, ICON_PROB, ICON_LENGTH, ICON_DIVISION, ICON_X_PATTERN,
+    ICON_TRANSPOSE};
 static const char *const TL_NAME[TL_N] = {"CLEAR", "REVERSE", "SHIFT", "SHIFT", "RANDOM", "COOK", "BEAT", "EUCLID",
-    "CLR", "REV", "FILL", "RND", "DOUBLE", "HALF"};
+    "CLR", "REV", "FILL", "RND", "DOUBLE", "HALF", "WRITE", "VARY"};
 /* EUCLID open (1.5.5): its cycle as cells, 16 a row (up to 4 rows), the hits filled; past it, inside LEN, the cells
  * of its repeats faint (DRUM: the lanes' row under them as always) */
 static void layer_euclid(void)
@@ -1108,20 +1111,31 @@ static void layer_seq(void)
         }
         lcell(LC_X(p % 4u), 4 + 32 * (int32_t)(p / 4u), 28, n, TL_ICON[p], 0, nm, st, 0);
     }
-    for (p = 0; drum && p < NLANE; p++) {               /* the lanes (black keys 1..8): 8 cells of 18 px, 2 px apart */
-        int32_t x = 6 + 20 * (int32_t)p;
-        uint16_t ink, fill = lc_box(x, 100, 18, 18, lc_fill(p == ui.lane % NLANE ? LS_SEL : LS_OFF, &ink));
-        GFX_HOOK_ALIGN(x, 100, x + 18, 118, AL_HV, "tools lane cell name centred");
-        cv_text_in(x, 100 + CAP_IN(S, 18), 18, &AF_S, drum_lane_abbr(TSEL, p), ink, fill);
+    for (p = 0; drum && p < NLANE; p++) {               /* the lanes (black keys 1..8): 8 cells of 16 px, 2 px apart */
+        int32_t x = 6 + 18 * (int32_t)p;
+        uint16_t ink, fill = lc_box(x, 100, 16, 18, lc_fill(p == ui.lane % NLANE ? LS_SEL : LS_OFF, &ink));
+        GFX_HOOK_ALIGN(x, 100, x + 16, 118, AL_HV, "tools lane cell name centred");
+        cv_text_in(x, 100 + CAP_IN(S, 18), 16, &AF_S, drum_lane_abbr(TSEL, p), ink, fill);
     }
-    for (p = TL_DOUBLE; !eu.on && p < TL_N; p++) {     /* 1.5.5: D5 DOUBLE (x2), E5 HALF (/2) at the row's end, */
-        int32_t x = 168 + 35 * (int32_t)(p - TL_DOUBLE);   /* 31 px each (the lanes' row: no room for their names) */
-        uint16_t ink, fill = lc_box(x, 100, 31, 18, lc_fill(st, &ink));
+    if (!drum && !eu.on)                                /* NEON: F5 WRITE, G5 VARY (a melodic track: full cells, the lanes' row) */
+        for (p = TL_WRITE; p < TL_N; p++) {
+            n[0] = W_NOTE[p];
+            lcell(LC_X(p - TL_WRITE), 68, 28, n, TL_ICON[p], 0, TL_NAME[p], st, 0);
+        }
+    for (p = TL_DOUBLE; !eu.on && p < (drum ? TL_N : TL_WRITE); p++) {   /* D5 x2, E5 /2 (a kit: F5 WR, G5 VA too) */
+        int32_t x = (drum ? 152 : 168) + (drum ? 21 : 35) * (int32_t)(p - TL_DOUBLE);   /* 31 px each, a kit 19 */
+        uint16_t ink, fill = lc_box(x, 100, drum ? 19 : 31, 18, lc_fill(st, &ink));
+        const char *lb = p == TL_DOUBLE ? "x2" : p == TL_HALF ? "/2" : p == TL_WRITE ? "WR" : "VA";
+        if (drum) {                                     /* (19 px: the label alone) */
+            GFX_HOOK_ALIGN(x, 100, x + 19, 118, AL_HV, "tools kit cell label centred");
+            cv_text_in(x, 100 + CAP_IN(S, 18), 19, &AF_S, lb, ink, fill);
+            continue;
+        }
         n[0] = W_NOTE[p];
         GFX_HOOK_ALIGN(0, 100, 0, 118, AL_V, "tools resize cell on its middle");
         cv_text_on(x + 5, 100 + CAP_IN(S, 18), &AF_S, n, fill == T_RAISE || fill == T_SURF ? T_MID : ink, fill);
         GFX_HOOK_ALIGN(0, 100, 0, 118, AL_V, "tools resize cell on its middle");
-        cv_text_r(x + 26, 100 + CAP_IN(S, 18), &AF_S, p == TL_DOUBLE ? "x2" : "/2", ink, fill);
+        cv_text_r(x + 26, 100 + CAP_IN(S, 18), &AF_S, lb, ink, fill);
     }
 }
 

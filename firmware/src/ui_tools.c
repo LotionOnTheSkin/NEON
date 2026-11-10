@@ -13,7 +13,7 @@
  * steps' automation and locks with them. RANDOM and COOK draw from libc.c rng(): no seed is kept, each press
  * differs. A sequence of ties reversed keeps its note first: N T T -> N T T at the mirrored place */
 enum { TL_CLEAR, TL_REV, TL_LEFT, TL_RIGHT, TL_RANDOM, TL_COOK, TL_BEAT, TL_EUCLID, TL_LCLR, TL_LREV, TL_LFILL, TL_LRND,
-       TL_DOUBLE, TL_HALF, TL_N };
+       TL_DOUBLE, TL_HALF, TL_WRITE, TL_VARY, TL_N };
 
 /* the track as the layer opened (OCT-): in the pool (RAM's .bss is tight), taken by layer_opened */
 static struct { step_t step[NSTEP]; motion_store_t mo; } tl_open __attribute__((section(".pool")));
@@ -25,7 +25,7 @@ static uint32_t tl_lane(const step_t *s, uint32_t l) { return (step_lanes(s) >> 
 /* place p's action is there for this track (the lane row and BEAT: DRUM only) */
 static int tl_cell(const track_t *t, uint32_t p)
 {
-    return p < TL_N && (p < TL_BEAT || p == TL_EUCLID || p >= TL_DOUBLE || drum_track(t));
+    return p < TL_N && (p < TL_BEAT || p == TL_EUCLID || p >= TL_DOUBLE || drum_track(t));   /* (F5 WRITE, G5 VARY: any) */
 }
 
 /* the undo copy of t as it is now (ui.c load_begin, but the automation is copied and stays): one action */
@@ -545,6 +545,221 @@ static uint32_t tl_half(track_t *t, uint32_t len)
     return h;
 }
 
+
+/* ------------------------------------------------------- NEON: WRITE, VARY --- */
+/* F5 WRITE: a one-bar part in the style of the track's sound (category.c: a kit the beat, a bass a bass line, a pad
+ * chords, a pluck / keys an arp, anything else a lead), written on the tonic in C as HARMONY wants it (prog.c), and the
+ * track set to QNT PROG: the part plays every chord of the progression. Each press the next style of that role.
+ * G5 VARY: a one-bar sequence (LEN 16 or less, repeated to fill a bar) made a 4-bar phrase A A' A B: the second bar
+ * answers the first (its later notes a step higher, a passing note in a gap), the fourth resolves (its second half
+ * falls to the root and holds; a kit: a tom fill into the next phrase). Both one undo (SAVE held), as every tool. */
+enum { WR_BASS, WR_PAD, WR_ARP, WR_LEAD, WR_DRUM, WR_NROLE };
+#define WR_NSTYLE 4u
+static const char *const WR_NAME[WR_NROLE][WR_NSTYLE] = {
+    {"BASS OCTAVES", "BASS GALLOP", "BASS OFFBEAT", "BASS ROOTS"},
+    {"PAD HOLD", "PAD PULSE", "PAD STABS", "PAD SEVENTHS"},
+    {"ARP UP", "ARP UP-DOWN", "ARP BROKEN", "ARP STRANGE"},
+    {"LEAD HOOK", "LEAD ANSWER", "LEAD SOAR", "LEAD RIFF"},
+    {"BEAT MOTORIK", "BEAT OUTRUN", "BEAT HALFTIME", "BEAT GATED"},
+};
+static uint8_t wr_next[NTRK];                           /* the style the next WRITE writes, per track */
+
+static uint32_t wr_role(const track_t *t)
+{
+    uint32_t c;
+    if (drum_track(t))
+        return WR_DRUM;
+    c = track_cat(t);
+    return c == CAT_BASS ? WR_BASS : c == CAT_PAD ? WR_PAD : c == CAT_PLUCK || c == CAT_KEYS ? WR_ARP : WR_LEAD;
+}
+/* degree d (0 the root, 2 the third, 4 the fifth, 7 the octave ..) above C at octave base, in the track's scale */
+static int32_t wr_deg(const track_t *t, int32_t base, int32_t d) { return deg_move(base, d, prog_mask(t), 0); }
+/* step i: the notes nt[0..n), held h steps (ties after it); flags SF_ACCENT .. */
+static void wr_put(track_t *t, uint32_t i, const int32_t *nt, uint32_t n, uint32_t h, uint32_t fl)
+{
+    step_t *s = &t->step[i % NSTEP];
+    uint32_t k;
+    step_clear(s);
+    s->time = ST_NOTE;
+    for (k = 0; k < n && k < 4u; k++)
+        s->note[k] = (uint8_t)clamp(nt[k], 0, 127);
+    s->n = (uint8_t)(n < 4u ? n : 4u);
+    s->flags = (uint8_t)fl;
+    for (k = 1; k < h && i + k < 16u; k++) {
+        step_clear(&t->step[i + k]);
+        t->step[i + k].time = ST_TIE;
+    }
+}
+static void wr_one(track_t *t, uint32_t i, int32_t base, int32_t d, uint32_t h, uint32_t fl)
+{
+    int32_t n = wr_deg(t, base, d);
+    wr_put(t, i, &n, 1, h, fl);
+}
+static void wr_chord(track_t *t, uint32_t i, uint32_t four, uint32_t h, uint32_t fl)
+{
+    int32_t nt[4];
+    uint32_t k;
+    for (k = 0; k < 3u + four; k++)
+        nt[k] = wr_deg(t, 60, (int32_t)(2u * k));       /* root, third, fifth (, seventh) */
+    wr_put(t, i, nt, 3u + four, h, fl);
+}
+static void wr_bass(track_t *t, uint32_t st)
+{
+    uint32_t i;
+    for (i = 0; i < 16u; i++)
+        switch (st) {
+        case 0: if (!(i & 1u)) wr_one(t, i, 36, i & 2u ? 7 : 0, 1, i % 4u ? 0 : SF_ACCENT); break;   /* root, octave 8ths */
+        case 1: if (i % 4u != 1u) wr_one(t, i, 36, i >= 12u && i % 4u == 3u ? 4 : 0, 1, i % 4u ? 0 : SF_ACCENT); break;
+        case 2: if (i % 4u == 2u) wr_one(t, i, 36, i == 14u ? 7 : 0, 1, SF_ACCENT); break;   /* the 8th offbeats */
+        default:
+            if (i == 0u) wr_one(t, 0, 36, 0, 10, SF_ACCENT);                 /* the root held, then the fifth, root */
+            if (i == 10u) wr_one(t, 10, 36, 4, 4, 0);
+            if (i == 14u) wr_one(t, 14, 36, 0, 2, 0);
+            break;
+        }
+}
+static void wr_pad(track_t *t, uint32_t st)
+{
+    uint32_t i;
+    if (st == 0u || st == 3u) {
+        wr_chord(t, 0, st == 3u, 16, SF_ACCENT);
+        return;
+    }
+    for (i = 0; i < 16u; i++)
+        if (st == 1u ? !(i & 1u) : (i == 0u || i == 3u || i == 6u || i == 10u || i == 13u))
+            wr_chord(t, i, 0, st == 1u ? 1u : 2u, i % 4u ? 0 : SF_ACCENT);
+}
+static void wr_arp(track_t *t, uint32_t st)
+{
+    static const int8_t A[WR_NSTYLE][8] = {
+        {0, 2, 4, 7, 0, 2, 4, 7}, {0, 2, 4, 7, 9, 7, 4, 2}, {0, 4, 2, 4, 7, 4, 2, 4}, {0, 2, 4, 6, 7, 6, 4, 2},
+    };
+    uint32_t i;
+    for (i = 0; i < 16u; i++)
+        wr_one(t, i, 60, A[st][i % 8u], 1, i % 4u ? 0 : SF_ACCENT);
+}
+static void wr_lead(track_t *t, uint32_t st)
+{
+    static const int8_t L[WR_NSTYLE][8][3] = {                 /* (step, degree, length); a length 0 ends it */
+        {{0, 7, 3}, {3, 6, 1}, {4, 4, 4}, {8, 5, 2}, {10, 4, 2}, {12, 2, 4}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 4, 2}, {2, 4, 1}, {3, 5, 1}, {4, 7, 4}, {8, 6, 2}, {10, 5, 2}, {12, 4, 4}, {0, 0, 0}},
+        {{0, 4, 6}, {6, 5, 2}, {8, 7, 8}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 2}, {2, 2, 2}, {4, 4, 2}, {6, 2, 2}, {8, 7, 2}, {10, 4, 2}, {12, 2, 2}, {14, 4, 2}},
+    };
+    uint32_t k;
+    for (k = 0; k < 8u && L[st][k][2]; k++)
+        wr_one(t, (uint32_t)L[st][k][0], 72, L[st][k][1], (uint32_t)L[st][k][2], k ? 0 : SF_ACCENT);
+}
+static void wr_drum(track_t *t, uint32_t st)
+{
+    uint32_t i;
+    for (i = 0; i < 16u; i++) {
+        uint32_t kick, snare, hat, oh = 0, tom = 0, clap = 0;
+        switch (st) {
+        case 0: kick = i == 0u || i == 6u || i == 8u; snare = i == 4u || i == 12u; hat = !(i & 1u); break;
+        case 1: kick = !(i % 4u); snare = clap = i == 4u || i == 12u; hat = 1; oh = i == 14u; break;
+        case 2: kick = i == 0u || i == 10u; snare = i == 8u; hat = !(i & 1u); break;
+        default: kick = i == 0u || i == 7u || i == 8u; snare = i == 4u || i == 12u; hat = !(i & 1u) && i < 12u;
+                 tom = i >= 13u; break;
+        }
+        step_clear(&t->step[i]);
+        if (kick) grid_hit(t, i, DV_KICK, 1);
+        if (snare) grid_hit(t, i, DV_SNARE, 1);
+        if (clap) grid_hit(t, i, DV_CLAP, 1);
+        if (hat && !oh) grid_hit(t, i, DV_HATC, 1);
+        if (oh) grid_hit(t, i, DV_HATO, 1);
+        if (tom) grid_hit(t, i, DV_TOM, 1);
+        if (kick && !(i % 4u)) grid_acc(t, i, DV_KICK, 1);
+        if (st == 1u && hat && (i & 2u)) grid_acc(t, i, DV_HATC, 1);   /* OUTRUN: the offbeat hats lean in */
+    }
+}
+static const char *wr_write(track_t *t)
+{
+    uint32_t r = wr_role(t), ti = trk_index(t) % NTRK, st = wr_next[ti] % WR_NSTYLE, i;
+    for (i = 0; i < NSTEP; i++)
+        step_clear(&t->step[i]);
+    switch (r) {
+    case WR_BASS: wr_bass(t, st); break;
+    case WR_PAD: wr_pad(t, st); break;
+    case WR_ARP: wr_arp(t, st); break;
+    case WR_LEAD: wr_lead(t, st); break;
+    default: wr_drum(t, st); break;
+    }
+    t->p[P_SLEN] = 16;
+    if (r != WR_DRUM && !chord_kit(t))
+        t->p[P_QUANT] = QN_PROG;                        /* it follows the progression */
+    wr_next[ti] = (uint8_t)((st + 1u) % WR_NSTYLE);
+    return WR_NAME[r][st];
+}
+/* VARY's bar 2: the later notes a scale step up (not on the beat), a passing note where an 8th is empty */
+static void vary_answer(track_t *t, uint32_t b)
+{
+    uint32_t i, mask = prog_mask(t);
+    int32_t last = -1;
+    for (i = 0; i < 16u; i++) {
+        step_t *s = &t->step[b + i];
+        uint32_t k;
+        if (s->time == ST_NOTE && s->n) {
+            last = s->note[0];
+            if (i >= 8u && i % 4u)
+                for (k = 0; k < s->n; k++)
+                    s->note[k] = (uint8_t)clamp(deg_move(s->note[k], 1, mask, 0), 0, 127);
+        } else if (s->time == ST_REST && last >= 0 && !(i & 1u) && i >= 6u && i < 12u) {
+            int32_t n = deg_move(last, -1, mask, 0);
+            step_clear(s);
+            s->time = ST_NOTE;
+            s->note[0] = (uint8_t)clamp(n, 0, 127);
+            s->n = 1;
+            last = -1;                                   /* (one passing note) */
+        }
+    }
+}
+/* VARY's bar 4: from step 8 the line falls to the root (the octave of the last note before) and holds */
+static void vary_resolve(track_t *t, uint32_t b)
+{
+    uint32_t i, mask = prog_mask(t), chord = 0;
+    int32_t last = 60;
+    for (i = 0; i < 8u; i++) {
+        const step_t *s = &t->step[b + i];
+        if (s->time == ST_NOTE && s->n) {
+            last = s->note[0];
+            chord = s->n >= 3u;
+        }
+    }
+    for (i = 8; i < 16u; i++)
+        step_clear(&t->step[b + i]);
+    {
+        int32_t root = snap_mask(last, mask, 0), o = ((root % 12) + 12) % 12, nt[3];
+        root -= o;                                       /* C (the tonic: PROG moves it) at that octave */
+        if (root + 7 < last)
+            root += 12;
+        if (chord) {
+            nt[0] = root;
+            nt[1] = deg_move(root, 2, mask, 0);
+            nt[2] = deg_move(root, 4, mask, 0);
+            wr_put(t, b + 8u, nt, 3, 8, SF_ACCENT);
+        } else {
+            nt[0] = deg_move(root, 2, mask, 0);
+            wr_put(t, b + 8u, nt, 1, 2, 0);              /* the third, then the root held */
+            nt[0] = root;
+            wr_put(t, b + 10u, nt, 1, 6, SF_ACCENT);
+        }
+    }
+    for (i = b + 9u; i < b + 16u; i++)                    /* (wr_put's ties stop at 16: past bar 1, set them here) */
+        if (t->step[i].time == ST_REST && (chord || i > b + 10u || i == b + 9u))
+            t->step[i].time = ST_TIE;
+}
+static void vary_fill(track_t *t, uint32_t b)            /* a kit: toms down into the next phrase, a snare on the last */
+{
+    uint32_t i;
+    for (i = 12; i < 16u; i++) {
+        step_clear(&t->step[b + i]);
+        grid_hit(t, b + i, i == 15u ? DV_SNARE : DV_TOM, 1);
+        grid_acc(t, b + i, i == 15u ? DV_SNARE : DV_TOM, i == 12u || i == 15u);
+    }
+    grid_hit(t, b + 12u, DV_KICK, 1);
+}
+
 /* ------------------------------------------------------------ actions --- */
 /* the action of place p on track t (lane l): its message; 0 = nothing done (said why) */
 static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
@@ -557,6 +772,26 @@ static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
     l %= NLANE;
     if ((p == TL_DOUBLE || p == TL_HALF) && !tl_resize_ok(t, p, len))
         return 0;
+    if (p == TL_VARY) {                                 /* a bar or less, with room to make it four */
+        uint32_t l2 = len;
+        if (len > 16u) {
+            ui_message("VARY: 1 BAR OR LESS");
+            return 0;
+        }
+        for (i = 0; i < len; i++)
+            n += drum ? (uint32_t)__builtin_popcount(step_lanes(&t->step[i])) : (uint32_t)tl_gate(&t->step[i]);
+        if (!n) {
+            ui_message("NOTHING TO VARY");
+            return 0;
+        }
+        while (l2 < NSTEP) {
+            if (!tl_motion_plan(t, l2, tl_nl(l2), tl_nl(l2) - l2, l2)) {
+                ui_message("AUTOMATION FULL");
+                return 0;
+            }
+            l2 = tl_nl(l2);
+        }
+    }
     if (p == TL_COOK) {                                 /* (nothing there: nothing to cook, no undo copy) */
         for (i = 0; i < len; i++)
             n += drum ? (uint32_t)__builtin_popcount(step_lanes(&t->step[i])) : (uint32_t)tl_gate(&t->step[i]);
@@ -600,6 +835,23 @@ static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
         fmt_int(b + str_len(b), (int32_t)(p == TL_DOUBLE ? tl_double(t, len) : tl_half(t, len)));
         str_cpy(b + str_len(b), " STEPS", sizeof b - str_len(b));
         return b;                                       /* (nothing emptied inside the new LEN: no unlock) */
+    case TL_WRITE:
+        msg = wr_write(t);
+        break;
+    case TL_VARY:
+        while (len < NSTEP)
+            len = tl_double(t, len);                    /* A A A A, automation and locks with the steps */
+        if (drum) {
+            for (i = 16; i < 32u; i++)                  /* A': a ghost hat on the 16ths between */
+                if ((i & 1u) && !step_lanes(&t->step[i]))
+                    grid_hit(t, i, DV_HATC, 1);
+            vary_fill(t, 48);
+        } else {
+            vary_answer(t, 16);
+            vary_resolve(t, 48);
+        }
+        msg = "VARIED: 4 BARS";
+        break;
     case TL_BEAT:                                       /* four on the floor, the backbeat, 8th hats */
         for (i = 0; i < len; i++) {
             step_clear(&t->step[i]);

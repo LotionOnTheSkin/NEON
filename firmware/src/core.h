@@ -43,10 +43,13 @@
 #endif
 /* SLICE (13), then ADPCM (14), then NEON (15): the other engines keep their numbers. With NEON and without ADPCM,
  * 14 stays reserved for ADPCM (engines.c: never offered, eng_ok), so a project from either kind of build loads the same */
-#define NENGINES (FELUCCA_NEON ? 16 : 13 + FELUCCA_SLICE + FELUCCA_ADPCM)
+#define NENGINES (FELUCCA_NEON ? 18 : 13 + FELUCCA_SLICE + FELUCCA_ADPCM)   /* NEON: 16 THUNDER, 17 ENSEMBLE */
+#define ENGI_JUNO 14u
+#define ENGI_THUNDER 16u
+#define ENGI_ENSEMBLE 17u
 #define ENGI_ADPCM 14u
 #define ENGI_NEON 15u
-#define ENG_RESERVED_14 (FELUCCA_NEON && !FELUCCA_ADPCM)   /* 14 held for ADPCM, not built */
+#define ENG_RESERVED_14 0        /* 14: JUNO (eng_juno.c) when ADPCM is not built */
 /* a stored engine number (a project's track, a user preset) this build cannot play: past the last, or 14 held for ADPCM
  * (rejected as before NEON, when 14 was past the last of a build without ADPCM) */
 #define ENG_BAD_STORED(e) ((uint32_t)(e) >= NENGINES || (ENG_RESERVED_14 && (uint32_t)(e) == ENGI_ADPCM))

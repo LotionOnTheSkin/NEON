@@ -4142,7 +4142,7 @@ static int test_quick_layers(void)
     }
     btn_up(B_EDIT); frame();
     bad += check("  the first 13 engines in PRESETS order have their white keys from F3 (ADPCM and NEON, after them, only with ENG; never DIGITAL)",
-                 ok && a == LY_INIT && LY_INIT == NENG_SHOWN - FELUCCA_ADPCM - FELUCCA_NEON);
+                 ok && a == LY_INIT && LY_INIT == 13u + FELUCCA_FM4);   /* (NEON: JUNO THUNDER STRINGS NEON after, with ENG) */
     set_engine_of(TSEL, 0);
     lay_combo(B_EDIT, white(eng_rank(3))); key_up(white(eng_rank(3))); frame();
     turn(EN_K2, 1);
@@ -5143,8 +5143,11 @@ static int test_fm4_retired(void)
 #if FELUCCA_ADPCM
                                             "ADPCM",
 #endif
+#if FELUCCA_NEON && !FELUCCA_ADPCM
+                                            "JUNO",
+#endif
 #if FELUCCA_NEON
-                                            "NEON",
+                                            "THUNDER", "STRINGS", "NEON",
 #endif
         };
         uint32_t last = 0xFFu, r = 0, n = 0;
@@ -9981,6 +9984,53 @@ static int test_edit_quick_actions(void)
 /* NEON HARMONY (prog.c): a PROG track's steps follow the progression bar by bar (DRIVE in C minor: C Ab Eb Bb, the
  * shorter way), its keys stopped follow the PROG page's SLOT, the progression is saved with the project, and MOOD on
  * the page loads one and sets the melodic tracks (not the drums) to PROG */
+/* NEON: WRITE, VARY, a chord's voice leading */
+static int test_write_vary(void)
+{
+    int bad = 0, ok;
+    track_t *t = &trk[1];
+    const char *m;
+    uint32_t i, n;
+    int32_t out[4];
+    static const uint8_t CHORD[3] = {60, 63, 67};
+    ui_power_on();
+    prog_set_mood(MOOD_DRIVE);
+    song.sel = 1;
+    t->p[P_SCALE] = 2;
+    t->p[P_ROOT] = 0;
+    t->p[P_QUANT] = QN_PROG;
+    prog_deg = 5;                                       /* VI: Ab C Eb */
+    prog_voice(t, CHORD, 3, 0, out);
+    ok = out[0] == 60 && out[1] == 63 && out[2] == 68;
+    bad += check("NEON: a chord step i -> VI by voice leading: C Eb G -> C Eb Ab (the common tones stay)", ok);
+    prog_deg = 6;                                       /* VII: Bb D F */
+    prog_voice(t, CHORD, 3, 0, out);
+    ok = out[0] == 58 && out[1] == 62 && out[2] == 65;
+    bad += check("NEON: .. i -> VII: C Eb G -> Bb D F (each the nearest, none twice)", ok);
+    prog_deg = 0;
+    m = tl_do(t, TL_WRITE, 0);
+    for (i = n = 0; i < 16u; i++)
+        n += t->step[i].time == ST_NOTE && t->step[i].n;
+    ok = m && t->p[P_SLEN] == 16 && t->p[P_QUANT] == QN_PROG && n > 0u;
+    bad += check("NEON: WRITE: a one-bar part, LEN 16, QNT PROG, its name said", ok);
+    {
+        const char *m2 = tl_do(t, TL_WRITE, 0);
+        bad += check("NEON: WRITE again: the next style", m2 && m && strcmp(m, m2) != 0);
+    }
+    m = tl_do(t, TL_VARY, 0);
+    ok = m && t->p[P_SLEN] == 64;
+    for (i = 0; i < 16u && ok; i++)                    /* bar 3 is bar 1 again */
+        ok &= t->step[32u + i].time == t->step[i].time && t->step[32u + i].n == t->step[i].n &&
+              (!t->step[i].n || t->step[32u + i].note[0] == t->step[i].note[0]);
+    for (i = n = 0; i < 16u; i++)                      /* bar 4 differs (it resolves) */
+        n += t->step[48u + i].time != t->step[i].time || t->step[48u + i].n != t->step[i].n ||
+             (t->step[i].n && t->step[48u + i].note[0] != t->step[i].note[0]);
+    ok &= n > 0u;
+    bad += check("NEON: VARY: 4 bars A A' A B (bar 3 the first, bar 4 resolves)", ok);
+    bad += check("NEON: VARY on 64 steps: refused", tl_do(t, TL_VARY, 0) == 0);
+    return bad;
+}
+
 static int test_harmony(void)
 {
     static const uint8_t WANT[4] = {48, 44, 51, 46};
@@ -10262,6 +10312,7 @@ int main(void)
     bad += test_no_flash();
     bad += test_ux18();
     bad += test_harmony();
+    bad += test_write_vary();
 #if FELUCCA_FM4
     bad += test_fm_charts();                        /* (DIGITAL's charts: built with FELUCCA_FM4=1 only) */
 #else

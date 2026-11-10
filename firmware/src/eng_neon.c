@@ -10,10 +10,11 @@
  *   WAVE PWM    a Juno-style DCO: two pulse waves (the second detuned by SPRD, up to 30 cents) whose width the voice's
  *               LFO sweeps (MOVE: up to +-25 % of the cycle, the two in opposite directions) on top of the shape
  *               routings, plus SAW, the same DCOs' saws mixed in (Juno 106: saw and pulse at once).
- *   WAVE JUNO   one Juno-60 DCO: a pulse whose width the voice's LFO sweeps (PWM: up to +-45 % of the cycle around
- *               50 %), its saw (SAW) and the sub square an octave down, divided from the DCO itself (SUB), so it is locked
- *               to it. No detune and no drift: a DCO. RATE (in place of WARM) is the LFO's rate, 0.05..40 Hz as the
- *               track LFO's; the LFO runs free, every note from its own point. (Made to rebuild a TAL U-NO-LX pad.)
+ *   WAVE JUNO   one Juno-60 DCO: a pulse whose width the voice's LFO sweeps as a Juno's PW does (PWM: from 50 % down,
+ *               to 5 % at 127, and back), its saw (SAW) and the sub square an octave down, divided from the DCO itself
+ *               (SUB), so it is locked to it. No detune and no drift: a DCO. RATE (in place of WARM) is the LFO's rate,
+ *               0.05..40 Hz as the track LFO's; the LFO runs free, every note from its own point. RATE 0 is MAN: no
+ *               LFO, PWM sets the width (the Juno's PW switch on MAN). (Made to rebuild TAL U-NO-LX patches.)
  *   WAVE SUB    a bass voice: two saws (the second detuned by SPRD) and a square an octave below (SUB: up to twice
  *               the saws' level, for a Juno-style sub-heavy bass). The phases
  *               restart with every note, so each one hits the same way: punchy, sequenced 8th/16th-note bass.
@@ -39,7 +40,8 @@ static const param_desc_t NEON_SAW = {"SAW", F_PCT, 0, 127, 90, 0, 0};
 static const param_desc_t NEON_SUB = {"SUB", F_PCT, 0, 127, 45, 0, 0};    /* 64: the saws' level, 127: twice it */
 static const param_desc_t NEON_J_SUB = {"SUB", F_PCT, 0, 127, 50, 0, 0};    /* JUNO: E1, E3 and E6 too */
 static const param_desc_t NEON_J_PWM = {"PWM", F_PCT, 0, 127, 40, 0, 0};
-static const param_desc_t NEON_J_RATE = {"RATE", F_LFOHZ, 0, 127, 67, 0, 0};
+static const char *const N_NEON_MAN[] = {"MAN", 0};
+static const param_desc_t NEON_J_RATE = {"RATE", F_LFOHZ, 0, 127, 67, N_NEON_MAN, 0};   /* 0: MAN (params.c) */
 
 /* the LFO: 0.5 Hz a block (CTL samples) plus up to 0.5 Hz more, a note's own (its seed) */
 #define NEON_LFO_BASE ((uint32_t)(((uint64_t)CTL << 31) / (uint64_t)FS))
@@ -113,7 +115,7 @@ static void neon_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     int32_t sprd = p[P_E1], blnd = p[P_E2], move = p[P_E3], warm = p[P_E6];
     uint32_t seed = (uint32_t)v->s[2];
     uint32_t lph = (uint32_t)v->s[3];
-    int32_t lt = osc_tri(lph);                                    /* the LFO, -32768..32767 */
+    int32_t lt = wave == NW_JUNO && !p[P_E6] ? 32767 : osc_tri(lph);   /* the LFO, -32768..32767 (JUNO RATE 0: MAN) */
     /* drift: the note's own offset (+-16 x MOVE / 256: up to +-3.3 ct) and the slow wobble (up to +-3.4 ct) */
     int32_t drift = (((int32_t)((seed >> 4) & 31u) - 16) * move) >> 8;
     int32_t wob = ((lt >> 10) * move) >> 9;
@@ -161,7 +163,7 @@ static void neon_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     } else if (wave == NW_JUNO) {
         /* one DCO: the pulse's width 50 % + the shape routings (+-12.5 %) + the LFO x PWM (+-45 %); its saw at SAW;
          * the sub a square an octave down, its phase the DCO's with one more bit on top (ph2's bit 31): locked to it */
-        int32_t so = shl(m->shape - (64 << 8), 15), lo = lt * move * 463;   /* +-0x7300_0000 at 127 */
+        int32_t so = shl(m->shape - (64 << 8), 15), lo = -((lt + 32768) >> 1) * move * 463;   /* one-sided, as a Juno's: 50 % down to 5 % at 127 */
         int32_t ow = clamp(so + lo, -0x73000000, 0x73000000);
         uint32_t pw = 0x80000000u + (uint32_t)ow, inc = m->inc, inc2 = m->inc >> 1, hi = ph2 & 0x80000000u;
         int32_t sw = blnd * 258, sb = sprd * 258;                /* SAW, SUB: Q15 */
@@ -260,16 +262,22 @@ static const preset_t NEON_PRESETS[] = {
     {"OUTRUN", {2, 20, 30, 8, 55, 50, 50, 64}, {0, 58, 10, 35}, 50, 1, FX(15, 0, 10, 10), PAT(1)},
     /* Neon Summers' own patches, rebuilt from recordings of them on a TAL U-NO-LX (fitted against the
      * recordings, rendered with this code): "VOLT_PAD", a Juno PWM pad at 1.7 Hz, and "KEY Miami Plucks" at 2 Hz */
-    {"VOLT PAD", {3, 0, 23, 65, 39, 0, 67, 103}, {0, 116, 67, 112}, 48, 0, FX(0, 80, 0, 0), PAT(5)},
-    {"MIAMI PLK", {3, 0, 36, 38, 48, 61, 70, 125}, {0, 102, 58, 119}, 63, 0, FX(0, 70, 0, 0), PAT(6)},
+    {"VOLT PAD", {3, 0, 28, 56, 39, 0, 67, 97}, {0, 115, 69, 112}, 50, 0, FX(0, 80, 0, 0), PAT(5)},
+    {"MIAMI PLK", {3, 0, 36, 70, 48, 65, 70, 127}, {0, 102, 58, 119}, 63, 0, FX(0, 70, 0, 0), PAT(6)},
     /* and "VOLT BASS I" (TAL U-NO-LX): saw and a loud sub, a 24 dB filter snapping shut, Juno chorus II */
     {"VOLT BASS", {2, 0, 82, 0, 25, 5, 40, 66}, {0, 89, 35, 71}, 63, 1, FX(0, 50, 0, 0), PAT(2)},
     /* and "PAD - Analog Pad": pulse, saw and sub, the pulse swept full depth at 0.8 Hz, the filter left alone */
-    {"ANALOG PAD", {3, 28, 94, 126, 71, 0, 53, 28}, {0, 46, 95, 100}, 4, 0, FX(0, 70, 0, 20), PAT(5)},
+    {"ANALOG PAD", {3, 28, 94, 123, 71, 0, 53, 28}, {0, 38, 79, 100}, 4, 0, FX(0, 70, 0, 20), PAT(5)},
     /* more JUNO: a chorused arp pluck, PWM strings and a swelling synth brass */
     {"JUNO ARP", {3, 30, 80, 40, 40, 40, 70, 64}, {0, 70, 0, 60}, 50, 0, FX(0, 60, 55, 30), PAT(13)},
     {"PWM STRNG", {3, 0, 110, 70, 64, 10, 60, 40}, {70, 90, 115, 95}, 6, 0, FX(0, 85, 0, 60), PAT(5)},
     {"SYNTH BRAS", {3, 20, 120, 20, 38, 20, 64, 64}, {30, 74, 100, 50}, 40, 0, FX(0, 40, 20, 40), PAT(6)},
+    /* and two more TAL U-NO-LX patches: "LEAD Detached Mode" (the pulse alone, PWM at 3.35 Hz, the filter opening on
+     * a soft attack) and "French Exploration" (pulse on MAN, narrow, with saw and sub: a short arp pluck) */
+    {"DETACHED", {3, 0, 0, 60, 49, 43, 82, 127}, {51, 127, 26, 89}, 63, 1, FX(0, 40, 20, 25), PAT(4)},
+    {"EXPLORE", {3, 124, 96, 121, 52, 36, 0, 127}, {0, 75, 0, 55}, 59, 0, FX(0, 30, 45, 25), PAT(13)},
+    /* "PAD Synth With Me" ("In Synth We Trust"): the saw alone through a resonant 24 dB filter, full key tracking */
+    {"WE TRUST", {2, 0, 0, 0, 80, 89, 0, 63}, {0, 113, 126, 86}, 0, 0, FX(0, 70, 0, 30), PAT(5)},
 };
 
 static const engine_t ENG_NEON = {
