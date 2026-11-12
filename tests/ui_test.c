@@ -4908,9 +4908,15 @@ static int test_bughunt_ui2(void)
             go_page(GR_TRK); frame(); frame();
             turn(EN_K1 + k, 1);                                       /* (K4 right: MUTE on, its badge shown) */
             ui.force = 1; frame();
+#if FELUCCA_NEON                                                   /* (SUNSET DRIVE's strip: ui_graph.c sunset_strip) */
+            a[k][0] = accent_in(X + 4, Y + 46, X + 31, Y + 121);      /* LEVEL: the fader, its dB */
+            a[k][1] = accent_in(X + 31, Y + 46, X + 55, Y + 67);      /* PAN */
+            a[k][2] = accent_in(X + 31, Y + 70, X + 55, Y + 116);     /* REV */
+#else
             a[k][0] = accent_in(X + 4, Y + 37, X + 38, Y + 71);       /* LEVEL */
             a[k][1] = accent_in(X + 3, Y + 84, X + 28, Y + 115);      /* PAN */
             a[k][2] = accent_in(X + 30, Y + 84, X + 55, Y + 115);     /* REV */
+#endif
             a[k][3] = accent_in(X + 22, Y + 4, X + 56, Y + 20);       /* the MUTE badge */
         }
         for (k = 0; k < 4u; k++) {

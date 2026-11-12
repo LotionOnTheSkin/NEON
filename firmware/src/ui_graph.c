@@ -1810,6 +1810,73 @@ static void track_strip(uint32_t c, uint32_t sel, uint32_t st, uint32_t mute, ui
         cv_rrect(5, TSS_MY, m < 3 ? 3 : m, 3, 1, T_MID, T_RAISE);
     cv_blit((uint32_t)CARD_X(c), LG_Y_GRAPH);
 }
+#if FELUCCA_NEON
+/* NEON: SUNSET DRIVE's mixer strip (57 x H_GRAPH): the cushion and its badges as Felucca's; the track's section in its
+ * colour; the sound; a wide LEVEL fader lit from the sun's gold up to magenta, the output meter beside it, the dB under
+ * it; PAN and REV as two small bars on the right. GREY / MONO: the fader in the track's ink, no sunset. */
+#define SD_FY 46                                     /* the fader: rows 46 .. 101 */
+#define SD_FH 56
+static const char *const SD_SEC[CAT_N] = {"-", "BASS", "LEAD", "PAD", "ARP", "KEY", "DRUMS", "FX", "-"};
+static void sunset_strip(const track_t *t, uint32_t c, uint32_t sel, uint32_t st, uint32_t mute, uint32_t arm,
+                         uint32_t hot, uint32_t lvl, const char *b, uint32_t lit, int32_t pan, int32_t rv)
+{
+    uint32_t cat = drum_track(t) ? (uint32_t)CAT_DRUM : track_cat(t), plain = ux.mono || ux.pal_i == UI_BW_INDEX;
+    uint32_t sunset = ux.pal_i == UI_DEFAULT_INDEX;   /* (SUNSET, the default palette) */
+    uint16_t rc = mute ? T_DIM : cat_col(cat), ink = hot == 1u ? T_ACCENT : rc;
+    int32_t fh = (int32_t)lvl * SD_FH / 127, mh = ts.meter[c] * SD_FH / (TS_MH - 2), y;
+    char v[8];
+    cv_begin(CARD_W, H_GRAPH, T_BG);
+    cv_rrect(0, 0, CARD_W, H_GRAPH, 5, T_SURF, T_BG);
+    cv_icon_on(4, 5, 16, trk_icon(c, sel), lit ? (sel ? T_TEXT : T_ACCENT) : sel ? T_ACCENT : T_MID, T_SURF);
+    if (st)
+        GFX_HOOK_ALIGN(0, 5, 0, 21, AL_V, "mixer badge on the cushion's line");
+    if (st == 1u || st == 2u)
+        cv_keycap(53 - kc_w(st == 1u ? KC_REC : KC_ARM), 6, st == 1u ? KC_REC : KC_ARM, st == 1u ? T_REC : T_ACCENT,
+                  T_INK, T_SURF);
+    else if (st)
+        cv_keycap(53 - kc_w(KC_MUTE), 6, KC_MUTE, hot == 4u ? T_ACCENT : T_KEY, T_INK, T_SURF);
+    if (mute && arm)
+        GFX_HOOK_ALIGN(0, 21 + AF_S_CAP_Y, 0, 21 + AF_S_CAP_Y + AF_S_CAP_H, AL_V, "mixer MUTE badge on the name's line");
+    if (mute && arm)
+        cv_keycap(5, 21 + AF_S_CAP_Y + HALF_UP(AF_S_CAP_H - KC_H), KC_MUTE, hot == 4u ? T_ACCENT : T_KEY, T_INK, T_SURF);
+    else
+        cv_free_text(5, 21, &AF_S, SD_SEC[cat % CAT_N], rc, T_SURF, CARD_W - 10);   /* the section, in its colour */
+    cv_free_text(5, 32, &AF_S, b, mute ? T_DIM : sel ? T_TEXT : T_MID, T_SURF, CARD_W - 10);   /* the sound */
+    cv_rrect(5, SD_FY, 18, SD_FH, 3, T_RAISE, T_SURF);          /* the fader's slot */
+    for (y = 0; y < fh; y++) {                                   /* lit from the bottom: gold at the floor, magenta on top */
+        uint16_t col = mute ? T_DIM : plain ? ink
+                       : sunset ? ux_mix(0xFE8C, 0xF9F4, y * 100 / SD_FH)     /* SUNSET: gold to magenta */
+                                : ux_mix(ux_mix(rc, T_SURF, 45), rc, y * 100 / SD_FH);   /* else: the section's colour */
+        cv_rect(6, SD_FY + SD_FH - 1 - y, 16, 1, hot == 1u && y == fh - 1 ? T_TEXT : col);
+    }
+    cv_rect(24, SD_FY, 2, SD_FH, T_RAISE);                      /* the output meter, against the fader */
+    if (mh > 0)
+        cv_rect(24, SD_FY + SD_FH - (mh > SD_FH ? SD_FH : mh), 2, mh > SD_FH ? SD_FH : mh, plain || !sunset ? T_MID : 0x073F);
+    if (lvl) {
+        int32_t d = LEVEL_DB_X10[lvl];
+        fmt_int(v, (d + (d < 0 ? -5 : 5)) / 10);
+    } else
+        str_cpy(v, "OFF", sizeof v);
+    GFX_HOOK_ALIGN(0, 0, 32, 0, AL_H, "sunset mixer dB under its fader");
+    cv_text_in(0, SD_FY + SD_FH + 5, 32, &AF_S, v, hot == 1u ? T_ACCENT : lvl ? T_TEXT : T_DIM, T_SURF);
+    {   /* PAN (from the middle) and REV: two short bars, their numbers above */
+        int32_t pw = pan * 8 / 64, rh = rv * 30 / 127;
+        uint16_t pc = hot == 2u ? T_ACCENT : rc, qc = hot == 3u ? T_ACCENT : rc;
+        GFX_HOOK_ALIGN(31, 0, 53, 0, AL_H, "sunset mixer pan caption centred");
+        cv_text_in(31, SD_FY, 22, &AF_S, "PAN", hot == 2u ? T_ACCENT : T_DIM, T_SURF);
+        cv_rect(32, SD_FY + 14, 20, 3, T_RAISE);
+        cv_rect(41, SD_FY + 12, 2, 7, T_DIM);
+        if (pw)
+            cv_rect(pw > 0 ? 43 : 41 + pw, SD_FY + 14, pw > 0 ? pw : -pw, 3, pc);
+        GFX_HOOK_ALIGN(31, 0, 53, 0, AL_H, "sunset mixer rev caption centred");
+        cv_text_in(31, SD_FY + 26, 22, &AF_S, "REV", hot == 3u ? T_ACCENT : T_DIM, T_SURF);
+        cv_rrect(37, SD_FY + 40, 10, 28, 2, T_RAISE, T_SURF);
+        if (rh > 1)
+            cv_rect(38, SD_FY + 67 - (rh * 26 / 30), 8, rh * 26 / 30, qc);
+    }
+    cv_blit((uint32_t)CARD_X(c), Y_GRAPH);
+}
+#endif
 static void draw_tracks(void)
 {
     uint32_t c, sk = strip_kind() == SK_TRK;
@@ -1844,6 +1911,10 @@ static void draw_tracks(void)
             track_strip(c, sel, st, mute, arm, hot, lvl, b, lit);
             continue;
         }
+#if FELUCCA_NEON
+        sunset_strip(t, c, sel, st, mute, arm, hot, lvl, b, lit, pan, rv);
+        continue;
+#endif
         cv_begin(CARD_W, H_GRAPH, T_BG);
         cv_rrect(0, 0, CARD_W, H_GRAPH, 5, T_SURF, T_BG);
         cv_icon_on(4, 5, 16, trk_icon(c, sel), lit ? (sel ? T_TEXT : T_ACCENT) : sel ? T_ACCENT : T_MID, T_SURF);
@@ -2099,6 +2170,13 @@ static void sg_dash(int32_t bx, int32_t bw, int32_t lo, int32_t hi, uint16_t c) 
         }
 }
 /* an outline of w x h at x, y, n px thick, clipped to lo .. hi (its ends only where not clipped) */
+/* NEON: each lane's blocks in its track's colour (the section it plays: cat_col); Felucca: THEME */
+#if FELUCCA_NEON
+static uint16_t sg_ink_c = 0;
+#define SG_INK (sg_ink_c ? sg_ink_c : T_THEME)
+#else
+#define SG_INK T_THEME
+#endif
 static void sg_frame(int32_t bx, int32_t bw, int32_t y, int32_t h, uint32_t n, int32_t lo, int32_t hi, uint16_t c)
 {
     int32_t x0 = bx > lo ? bx : lo, x1 = bx + bw < hi ? bx + bw : hi;
@@ -2116,7 +2194,7 @@ static void sg_frame(int32_t bx, int32_t bw, int32_t y, int32_t h, uint32_t n, i
 typedef struct { int32_t c0, c1, p0, p1; uint16_t pf; } sg_fill_t;
 static uint16_t sg_fill_at(const sg_fill_t *F, int32_t x)   /* the block's fill under column x */
 {
-    return x >= F->c0 && x < F->c1 ? T_THEME : x >= F->p0 && x < F->p1 ? F->pf : T_RAISE;
+    return x >= F->c0 && x < F->c1 ? SG_INK : x >= F->p0 && x < F->p1 ? F->pf : T_RAISE;
 }
 /* the slot's letter at x (MENU > LARGE: M), its capitals SG_PAD under the lane's top; 0: no room before x1 */
 static int32_t sg_letter(int32_t x, int32_t x1, int32_t y, uint32_t s, uint16_t ink, uint16_t bg)
@@ -2160,7 +2238,7 @@ static void sg_picture(const song_lay_t *L, int32_t off, uint32_t k, uint32_t i,
             if (x < a || (x >= skip[0] && x < skip[1]) || (x >= skip[2] && x < skip[3]))
                 continue;
             fill = sg_fill_at(F, x);
-            bar = fill == T_THEME ? T_INK : T_THEME;
+            bar = fill == SG_INK ? T_INK : SG_INK;
             if (cut) {                                 /* a pass begins: the notch */
                 cv_rect(x, y + SG_PAD, 1, SG_PH, T_SURF);
                 continue;
@@ -2185,14 +2263,17 @@ static void sg_block(const song_lay_t *L, int32_t off, uint32_t k, uint32_t i, u
     int saved = graph_project_used(s), cur = c >= i && c < j;
     sg_fill_t F = {0, 0, 0, 0, 0};
     uint32_t p = chain.running && chain.row >= i && chain.row < j ? chain.row : 0xFFu;
+#if FELUCCA_NEON
+    sg_ink_c = role_col(&trk[k % NTRK]);              /* (the lane's track) */
+#endif
     if (x1 <= x0)
         return;
     if (!saved) {                                      /* not saved: an outline, the letter DIM */
         if (cur) {
             int32_t cx = SG_X0 + L->x[c] - off, cw = L->x[c + 1u] - L->x[c] - SG_GAP;
             sg_frame(bx, bw, y, SG_LH, 1, SG_X0, hi, T_DIM);
-            sg_frame(cx, cw, y, SG_LH, 2, SG_X0, hi, T_THEME);
-            sg_letter((cx > SG_X0 ? cx : SG_X0) + SG_PAD, x1, y, s, T_THEME, T_SURF);
+            sg_frame(cx, cw, y, SG_LH, 2, SG_X0, hi, SG_INK);
+            sg_letter((cx > SG_X0 ? cx : SG_X0) + SG_PAD, x1, y, s, SG_INK, T_SURF);
             return;
         }
         sg_frame(bx, bw, y, SG_LH, 1, SG_X0, hi, T_DIM);
@@ -2219,14 +2300,14 @@ static void sg_block(const song_lay_t *L, int32_t off, uint32_t k, uint32_t i, u
         F.c0 = cx > SG_X0 ? cx : SG_X0;
         F.c1 = cx + cw < hi ? cx + cw : hi;
         if (F.c1 > F.c0)
-            cv_rrect(F.c0, y, F.c1 - F.c0, SG_LH, j - i == 1u && F.c0 == cx && F.c1 == cx + cw ? 2 : 0, T_THEME, T_SURF);
+            cv_rrect(F.c0, y, F.c1 - F.c0, SG_LH, j - i == 1u && F.c0 == cx && F.c1 == cx + cw ? 2 : 0, SG_INK, T_SURF);
     }
     lx = x0 + SG_PAD;                                  /* the letters: the block's, the cell's (when it starts later) */
     if (!(F.c1 > F.c0 && lx >= F.c0 && lx < F.c1) && (w = sg_letter(lx, F.c1 > F.c0 && F.c0 > lx ? F.c0 : x1, y, s, T_TEXT, sg_fill_at(&F, lx)))) {
         skip[0] = lx - 1;
         skip[1] = lx + w + 2;
     }
-    if (F.c1 > F.c0 && (w = sg_letter(F.c0 + SG_PAD, F.c1, y, s, T_INK, T_THEME))) {
+    if (F.c1 > F.c0 && (w = sg_letter(F.c0 + SG_PAD, F.c1, y, s, T_INK, SG_INK))) {
         skip[2] = F.c0 + SG_PAD - 1;
         skip[3] = F.c0 + SG_PAD + w + 2;
     }
