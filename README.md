@@ -9,8 +9,7 @@ By **Neon Summers**. Free and open source (GPL-3.0).
 
 ## Install
 
-1. Download **[`neon.fwsc`](../../releases/download/neon-latest/neon.fwsc)** from
-   [Releases](../../releases/tag/neon-latest).
+1. Download **`neon.fwsc`** from the [latest release](../../releases/latest).
 2. Install it with the [FM-1 Firmware Hub](https://thefirmwarehub.com/) or any FM-1 installer that accepts a
    `.fwsc` file.
 3. Back up your projects and presets before changing firmware. M-VAVE's own updater takes you back to the official
@@ -71,6 +70,7 @@ into the slot that is loaded: the song is stored with it.
   projects made on Felucca still play.
 - Projects and user presets that use NEON's engines do not load on Felucca.
 - Tested on a real FM-1. It is a young project: back up anything you care about.
+- Package identity: `FM-1_1984`.
 - Developed with the help of AI coding tools.
 
 ## Credits

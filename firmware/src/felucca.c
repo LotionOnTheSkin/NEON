@@ -33,7 +33,7 @@
 #define FELUCCA_UART 1           /* TRS MIDI IN on UART1 / PH8 */
 #endif
 #ifndef FELUCCA_ID
-#define FELUCCA_ID "FM-1_900"    /* package identity (build.py: the .fwsc marker string) */
+#define FELUCCA_ID "FM-1_1984"   /* package identity: NEON's own (build.py: the .fwsc marker string) */
 #endif
 #ifndef FELUCCA_CPU2
 #define FELUCCA_CPU2 1           /* 1 (1.6.1): the second core is built in and renders some parts when MENU > SYSTEM >

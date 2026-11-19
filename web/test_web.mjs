@@ -1633,7 +1633,7 @@ async function packages() {
   const logical = py(`import sys; raw = open(sys.argv[1], "rb").read()
 sys.stdout.buffer.write(b"".join(raw[i * 48:i * 48 + 47] for i in range(20)) + raw[960:])`, pkg);
   ok(eq(logicalImage(raw), logical), "fm1pkg.js logicalImage");
-  ok(/^FM-1_9\d\d$/.test(productOf(raw)), "fm1pkg.js productOf");
+  ok(productOf(raw) === "FM-1_1984", "fm1pkg.js productOf (NEON's identity)");
 }
 
 /* ------------------------------------------------- update protocol (fm1ota.js) --- */

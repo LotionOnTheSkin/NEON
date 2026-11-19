@@ -1,0 +1,9 @@
+{
+  "what": "A synthwave groovebox: Juno pads, supersaw leads, pulsing basses and 80s drum machines. Pick a mood and one chord progression drives every track; WRITE drafts a part for each sound and VARY turns a bar into a 4-bar phrase. About 220 presets sorted by role.",
+  "author": "Neon Summers",
+  "kinds": "groove",
+  "play": "https://joakimeriksson.github.io/fm1-emu",
+  "image": "docs/card.png",
+  "color": "#FF3EA5",
+  "sounds": "CC0: Hügelton Sample Pack (assets/samples-cc0, from Felucca)"
+}
