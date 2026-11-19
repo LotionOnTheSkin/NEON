@@ -1,8 +1,9 @@
 # Builds the NEON firmware on GitHub's Linux machines, where JieLi's toolchain runs natively, then runs the whole
 # test suite against the build.
 #   a push to main: the build is kept with the run (Actions > the run > Artifacts), no release
-#   a tag vX.Y (git tag v0.1 && git push origin v0.1): a release build (version vX.Y), published as the GitHub
-#   release vX.Y with neon.fwsc and SHA256SUMS, once the tests pass. The FM-1 Firmware Hub lists the newest release.
+#   a release: Actions > Build NEON firmware > Run workflow, VERSION 0.1 (or push a tag v0.1): a release build
+#   (version v0.1), published as the GitHub release v0.1 with neon.fwsc and SHA256SUMS once the tests pass.
+#   The FM-1 Firmware Hub lists the newest release.
 name: Build NEON firmware
 
 on:
@@ -10,6 +11,11 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, X.Y (e.g. 0.1). Empty: a build only, no release."
+        required: false
+        default: ""
 
 permissions:
   contents: write          # to publish the release
@@ -17,6 +23,10 @@ permissions:
 concurrency:
   group: build-neon-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # the release version: a tag vX.Y, or the version typed when running by hand; empty: no release
+  NEON_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version && format('v{0}', inputs.version) || '' }}
 
 jobs:
   build:
@@ -70,12 +80,12 @@ jobs:
 
       - name: Build
         run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then ./build.sh --release "${GITHUB_REF_NAME#v}"; else ./build.sh; fi
+          if [ -n "$NEON_VERSION" ]; then ./build.sh --release "${NEON_VERSION#v}"; else ./build.sh; fi
 
       - name: Name the package
         run: |
           mkdir -p dist
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then cp "build/felucca-${GITHUB_REF_NAME#v}.fwsc" dist/neon.fwsc; cp build/felucca-${GITHUB_REF_NAME#v}.fwsc build/felucca.fwsc
+          if [ -n "$NEON_VERSION" ]; then cp "build/felucca-${NEON_VERSION#v}.fwsc" dist/neon.fwsc; cp "build/felucca-${NEON_VERSION#v}.fwsc" build/felucca.fwsc
           else cp build/felucca.fwsc dist/neon.fwsc; fi
           cp build/felucca.bin dist/neon-app.bin
           (cd dist && sha256sum neon.fwsc neon-app.bin > SHA256SUMS)
@@ -100,13 +110,13 @@ jobs:
         run: sh tests/run_tests.sh
 
       - name: Publish the release (a version tag, the tests passed)
-        if: github.ref_type == 'tag'
+        if: env.NEON_VERSION != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/neon.fwsc dist/neon-app.bin dist/SHA256SUMS --verify-tag \
-            --title "NEON $GITHUB_REF_NAME" \
-            --notes "NEON $GITHUB_REF_NAME, a synthwave groovebox firmware for the M-VAVE FM-1 (identity FM-1_1984).
+          gh release create "$NEON_VERSION" dist/neon.fwsc dist/neon-app.bin dist/SHA256SUMS --target "$GITHUB_SHA" \
+            --title "NEON $NEON_VERSION" \
+            --notes "NEON $NEON_VERSION, a synthwave groovebox firmware for the M-VAVE FM-1 (identity FM-1_1984).
 
           **Install:** with the FM-1 Firmware Hub (https://thefirmwarehub.com) or any FM-1 installer that takes a \`.fwsc\` file. Back up your projects first. M-VAVE's own updater takes the FM-1 back to the official firmware.
 
