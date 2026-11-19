@@ -1,67 +1,83 @@
-# NEON — Felucca with a synthwave engine
+# NEON: a synthwave groovebox for the M-VAVE FM-1
 
-This fork of [Felucca](https://github.com/hugelton/Felucca) adds **NEON**, a synthwave sound engine for the M-VAVE FM-1:
-lush supersaw pads, Juno-style PWM strings and deep pulsing bass, through a 24 dB/oct filter with warmth and slow
-analog drift (MOVE). Everything else is Felucca as it is upstream.
+NEON turns the FM-1 into an all-in-one synthwave song maker: Juno pads, supersaw leads, pulsing basses, 80s drum
+machines and a sequencer that knows what chord you are on. It is a fork of
+[Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita, with new sound engines, about 220 synthwave
+presets, songwriting tools and a sunset-and-grid look.
 
-- **Download:** [Releases › neon-latest › `neon.fwsc`](../../releases/tag/neon-latest), built by GitHub Actions on every push
-  (`.github/workflows/build-neon.yml`).
-- **Try it in the browser:** open the [FM-1 emulator](https://joakimeriksson.github.io/fm1-emu), load `neon.fwsc`, press Start.
-- **Play it:** NEON is the last engine. On the PRESETS page, turn the ENG knob to NEON. Its presets: NEON SKY,
-  SUMMERS, DRIVE BS, NIGHT BS, HERO LD, BRASS 85, STAB, ARP PLK, VHS STR, MIDNIGHT, SUB DRV, OUTRUN, then Neon Summers'
-  own patches rebuilt from recordings (VOLT PAD, MIAMI PLK, VOLT BASS, ANALOG PAD; and DBL IMPACT on ANALOG), then
-  JUNO ARP, PWM STRNG and SYNTH BRAS.
-- **Synthwave presets everywhere:** every engine's factory presets are replaced with synthwave sounds (ANALOG's
-  MIAMI LEAD and VAPOR PAD, PHASE's CZ sounds, LOFI's chip leads, TRIO's MEGA BASS, WHEEL's CATHEDRAL, NOISE's
-  UPLIFTER riser, VOICE's VOX PAD, GRAIN's DREAM CLOUD, PHYS's STAR BELLS and SIMMONS, the 80s FM sounds on FM6,
-  DRUM's GATED 85 / 808 NIGHT / DRIVE KIT / NEON KIT / PERC 84; DRUM KIT stays first for older projects).
-  Felucca-Engines is vendored in `firmware/engines` (MIT, its LICENSE kept) so its presets can change.
-- **The look:** Sunset Drive. A sun-and-grid boot screen, the SUNSET palette (deep indigo, magenta, cyan) as the default
-  (MENU > COLOR still offers Felucca's palettes), and Chakra Petch type throughout.
-- **SUNSET DRIVE:** tap HOME from HOME to step HOME > MIXER > CLOCK > **DRIVE**: a visualizer where the grid rolls
-  toward you one line a beat (it follows the tempo and stops when you stop), the sun swells with the loudest track,
-  the horizon glows with the bass, and a light per track shines in the sky.
-- **HARMONY: one progression drives the song.** SCL > CHORD > **PROG**: pick a MOOD (DRIVE i-VI-III-VII, DAWN,
-  NIGHT, MYST, HEART, RISE) and every melodic track follows it (QNT **PROG**): its steps, keys and arp are written in C
-  and move with each chord, by scale steps, the shorter way, so a bass, a pad and an arp written once play the whole
-  progression. ROOT is the key. SLOT / CHORD edit the eight chords (OWN), BARS sets 1, 2 or 4 bars a chord; stopped,
-  the keys play SLOT's chord. A MOOD on a new song drops starter phrases into the empty tracks (a 16th bass, a held
-  triad, a 16th arp, a beat): pick a mood, press PLAY. The progression is saved with the project, and in a SONG
-  (GLO) each section plays the progression of its slot, from its first chord.
-- **Long patterns:** up to 64 steps a track (hold SEQ: LEN; DOUBLE / HALF). On STEP, the PRESETS knob turns a page
-  of 16 a detent when the pattern is longer (KNOB 1 a step), and pills over the piano roll show the page.
-- **PUMP:** the SLICER's fourth mode: the track ducks on every beat (DEPTH) and swells back (PAT: how slowly): the
-  sidechain pump, in time at any tempo.
-- **Stereo chorus:** the chorus bus is a Juno's now: two taps swept against each other, one left, one right.
-- **Phrases:** SAVE > PHRASES adds DRIVE BS, PULSE 8, PAD BAR, STABS, ARP 16, LEAD 80, DRIVE BT (PAD BAR and STABS
-  load triads in the track's scale).
-- **Six sections, NEON's own sounds:** PRESETS lists **BASS, LEAD, PAD, ARP, KEY, DRUMS** (KNOB 4 LIST), every row
-  tagged with its section in its colour. About 220 sounds: Neon Summers' 67 TAL U-NO-LX patches on JUNO, 113 Sylenth1
-  patches (his own and the Retro Thunder bank) on THUNDER, STRINGS, NEON and ten drum kits. They were carried over by
-  conversion tools from the preset files, so they are close relatives of the originals, not copies. Felucca's own
-  engines (ANALOG, FM6, SAMPLE ..) are no longer listed; they stay in the firmware so an older project still plays.
-- **Presets set more of the track:** a sound can carry its LFO, key tracking, glide, transposition and arp
-  (an ARP sound turns the arp on; the next sound loaded turns it off again).
-- **New engines:** **JUNO** (engine 14): a Juno-106 voice: PULS (0 off, then PWM depth), MODE (MAN, LFO rates, ENV),
-  SAW, SUB | CUT, RES, HPF, NOIS. **THUNDER** (16): two oscillators in unison (A three voices, B two at INT), a wave pair,
-  DET, MIX | CUT, RES, DRV, a 12 / 24 dB slope. **STRINGS** (17): a string machine: two footages, an ensemble (ENS, SPD),
-  BAL | CUT, HPF, AIR, KTR. Picked with PRESETS' ENG knob.
-- **80s drum kits:** DRUM's KIT adds **LINN**, **DMX**, **GATE** and **SIMM**; DMX, GATE and SIMM have a gated snare
-  (the tail holds, then shuts: 180, 300, 220 ms, longer or shorter with DECAY).
-- **WRITE and VARY** (hold SEQ: TOOLS): **F5 WRITE** writes a one-bar part for the track's sound (a bass line, pad chords,
-  an arp, a lead, a beat) on QNT PROG, so it plays the whole progression; press again for the next style (four a role).
-  **G5 VARY** makes a bar a 4-bar phrase: A, an answer, A, and a resolution (a kit: a tom fill).
-- **Voice leading:** a chord step on a PROG track moves each note to the nearest tone of the chord in play (the common
-  tones stay), instead of the whole chord sliding.
-- **Chord lane and role colours:** on STEP the piano roll lights the chord's rows and names the chord ("C MIN  VI");
-  each kind of sound has its colour (bass cyan, pad violet, lead pink, arp amber, kit yellow; GREY and MONO stay plain).
-- **The engine:** `firmware/src/eng_neon.c` (MIT). WAVE (SUPER / PWM / SUB / JUNO), SPRD, BLND, MOVE, CUT, RES, WARM,
-  KTR. JUNO is one Juno-60 DCO: pulse with LFO PWM, saw, a locked sub; its knobs read SUB, SAW, PWM and RATE.
-- **Status:** experimental. It passes Felucca's host test suite; it has not yet been played on a real FM-1. Its CPU
-  cost was estimated on a computer (about 2 to 2.5 ANALOG voices a voice), so it is capped at 6 voices.
+By **Neon Summers**. Free and open source (GPL-3.0).
 
-Engine numbers: NEON is engine 15, JUNO 14 (Felucca's ADPCM slot, not built here), THUNDER 16, STRINGS 17. A project or
-user preset with one of these sounds does not load on upstream Felucca.
+## Install
+
+1. Download **[`neon.fwsc`](../../releases/download/neon-latest/neon.fwsc)** from
+   [Releases](../../releases/tag/neon-latest).
+2. Install it with the [FM-1 Firmware Hub](https://thefirmwarehub.com/) or any FM-1 installer that accepts a
+   `.fwsc` file.
+3. Back up your projects and presets before changing firmware. M-VAVE's own updater takes you back to the official
+   firmware.
+
+**Try it first in your browser:** open the [FM-1 emulator](https://joakimeriksson.github.io/fm1-emu), load
+`neon.fwsc` and press Start.
+
+## Sounds
+
+The preset list is organised by what a sound does: **BASS, LEAD, PAD, ARP, KEY, DRUMS**, each tagged in its own
+colour. Turn the PRESETS knob to browse; KNOB 4 picks the section.
+
+- **JUNO:** a Juno-106-style voice: saw, pulse with LFO, manual or envelope PWM, sub, noise, a 24 dB filter and a
+  high-pass. 67 presets converted from TAL U-NO-LX patches.
+- **THUNDER:** two stacked unison oscillators with drive and a 12 or 24 dB filter, for big leads, brass and basses.
+  113 presets converted from Sylenth1 patches.
+- **STRINGS:** a string machine with a swirling ensemble chorus.
+- **NEON:** supersaw, PWM, sub and Juno modes with slow analog drift.
+- **DRUMS:** ten 80s kits, including LINN, DMX, BIG GATE (a gated-reverb snare) and HEX PADS.
+
+The converted presets are close relatives of the originals, not exact copies. A preset can also set its track's LFO,
+glide, key tracking, octave and arpeggiator, so an ARP sound plays as an arp straight away.
+
+## Songwriting
+
+- **HARMONY:** pick a MOOD (SCL > CHORD > PROG) and one chord progression drives every melodic track. Write a bass,
+  pad or arp once and it follows the chords. A new song gets starter parts: pick a mood, press PLAY.
+- **WRITE:** hold SEQ and press F5 to write a one-bar part for the track's sound (bass line, pad chords, arp, lead or
+  beat). Press again for the next style.
+- **VARY:** hold SEQ and press G5 to turn one bar into a 4-bar phrase that answers itself and resolves (a drum track
+  gets a tom fill).
+- **Voice leading:** chords move to the nearest notes of the next chord instead of jumping as a block.
+- **Long patterns:** up to 64 steps per track.
+- **PUMP:** a tempo-synced sidechain duck on any track (FX > SLICER).
+- **Stereo Juno chorus** on the chorus bus.
+
+## Look
+
+- **Sunset Drive:** sun-and-grid boot screen and the SUNSET palette (other palettes stay in MENU > COLOR).
+- **Role colours:** bass cyan, pad violet, lead pink, arp amber, drums yellow, used on the tracks, mixer, song and
+  piano roll.
+- **Mixer:** each strip shows its section, its sound, a gold-to-magenta level fader with an output meter, pan and
+  reverb.
+- **Piano roll:** the current chord's notes are lit and named.
+- **DRIVE visualizer:** tap HOME from HOME to reach it. The grid rolls with the tempo and the sun swells with the
+  music.
+
+## Saving a song
+
+The FM-1 has four project slots, A to D. Build a pattern, then SAVE > PROJECT: KNOB 1 picks the slot, turn KNOB 4 to
+SAVE and press OCT+. Save each pattern to its own slot, then arrange them on the SONG page (GLO) and save once more
+into the slot that is loaded: the song is stored with it.
+
+## Notes
+
+- Felucca's own engines (ANALOG, FM6, SAMPLE and others) are not listed in NEON, but they stay in the firmware, so
+  projects made on Felucca still play.
+- Projects and user presets that use NEON's engines do not load on Felucca.
+- Tested on a real FM-1. It is a young project: back up anything you care about.
+- Developed with the help of AI coding tools.
+
+## Credits
+
+Built on [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton Instruments), GPL-3.0, with
+[Felucca-Engines](https://github.com/hugelton/Felucca-Engines) (MIT) and
+[felucca-bsp](https://github.com/hugelton/felucca-bsp) (MPL-2.0). NEON's engines are MIT. Full details: [CREDITS.md](CREDITS.md), [LICENSING.md](LICENSING.md).
 
 ---
 
