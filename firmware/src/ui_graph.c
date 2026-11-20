@@ -2451,6 +2451,7 @@ static void graph_song(void)
 #define DRV_GOLD 0xFE8Cu                                /* (255, 209, 102): SUNSET's sun top (as the splash's) */
 static struct { uint8_t lv[NTRK], ph; uint32_t sig; } drv;
 static int drv_plain(void) { return ux.pal_i == UI_GREY_INDEX || ux.pal_i == UI_BW_INDEX; }
+#if !FELUCCA_NEON
 static uint32_t drv_isqrt(uint32_t v)
 {
     uint32_t r = 0;
@@ -2458,6 +2459,7 @@ static uint32_t drv_isqrt(uint32_t v)
         r++;
     return r;
 }
+#endif
 static void drive_pass(int32_t y0, uint32_t ph, uint32_t loud, uint32_t bass)
 {
     int plain = drv_plain();
@@ -2478,6 +2480,19 @@ static void drive_pass(int32_t y0, uint32_t ph, uint32_t loud, uint32_t bass)
                 c = ux_mix(c, T_ACCENT, (int32_t)bass * (5 - up) * 7 / 255);
             cv_rect(0, y, 240, 1, c);
         }
+#if FELUCCA_NEON                                        /* NEON: the logo, standing on the horizon, swelling with the mix */
+        if (y >= DRV_HZ - 2 * r && y < DRV_HZ) {
+            uint16_t bg = !plain && y >= 20 ? ux_mix(T_BG, sky, (y - 20) * 100 / (DRV_HZ - 20)) : T_BG;
+            uint16_t c = plain ? T_TEXT : ux.pal_i == UI_DEFAULT_INDEX ? LOGO_ROW[(y - (DRV_HZ - 2 * r)) * LOGO_N / (2 * r)]
+                                   : ux_mix(T_TEXT, T_THEME, (y - (DRV_HZ - 2 * r)) * 100 / (2 * r));
+            if (!plain)
+                c = ux_mix(c, T_TEXT, (int32_t)loud * 22 / 255);
+            if (up <= 4 && !plain)
+                bg = ux_mix(bg, T_ACCENT, (int32_t)bass * (5 - up) * 7 / 255);
+            logo_row(y - (DRV_HZ - 2 * r), 2 * r, 120 - r, y, bg, c, 0, plain);
+        }
+        (void)dy; (void)slide; (void)top; (void)sun0;
+#else
         if (y < DRV_HZ && dy * dy < r * r) {            /* the sun, striped in its lower part */
             int stripe = up < 36 && ((up + slide) % 9) < 1 + (36 - up) / 12;
             if (!stripe) {
@@ -2488,6 +2503,7 @@ static void drive_pass(int32_t y0, uint32_t ph, uint32_t loud, uint32_t bass)
                 cv_rect(120 - hw, y, 2 * hw, 1, c);
             }
         }
+#endif
         if (y == DRV_HZ || y == DRV_HZ + 1)
             cv_rect(0, y, 240, 1, hz);
         if (y > DRV_HZ + 1) {                           /* the ground: cross lines rolling in, lines to the vanishing point */

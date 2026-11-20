@@ -24,6 +24,9 @@ typedef struct { const char *name; uint16_t c1, c2, c3, primary, secondary; } ui
 typedef struct { uint16_t off; uint8_t w; const char *label; } kc_t;
 #include "ui_fonts.h"                   /* AF_S 12 px / 400, AF_M 15 px / 500, AF_L 28 px / 600 */
 #include "ui_palettes.h"
+#if FELUCCA_NEON
+#include "neon_logo.h"                   /* NEON: the Neon Summers logo (tools/gen_logo.py) */
+#endif
 #include "ui_keycaps.h"                 /* KC_*: the keycaps / badges (tools/gen_aa_keycaps.py), KNOB_* arcs */
 #define ELLIPSIS '\x85'                 /* the ellipsis glyph of AF_S and AF_M */
 
@@ -252,6 +255,29 @@ static void cv_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
         for (i = x; i < x1; i++)
             cv_px[(uint32_t)y * cv_w + (uint32_t)i] = sc;
 }
+#if FELUCCA_NEON
+/* NEON: one row of the Neon Summers logo drawn d px wide (scaled from LOGO_N), its left at x0, on canvas row y over
+ * the row's background bg: its coverage blends it into bg (plain: solid where mostly covered, no blends). col: the
+ * row's colour, or own: the logo's own (LOGO_ROW, its magenta-to-orange). r: the logo's row, 0 .. d-1 */
+static void logo_row(int32_t r, int32_t d, int32_t x0, int32_t y, uint16_t bg, uint16_t col, int own, int plain)
+{
+    int32_t ly = r * LOGO_N / d, x = 0;
+    const uint8_t *row = &LOGO_A[ly * (LOGO_N / 4)];
+    uint16_t c = own ? LOGO_ROW[ly] : col;
+    while (x < d) {                                 /* runs of the same coverage: one rect each */
+        int32_t lx = x * LOGO_N / d, a = (row[lx >> 2] >> ((lx & 3) * 2)) & 3, e = x + 1;
+        while (e < d) {
+            int32_t mx = e * LOGO_N / d;
+            if (((row[mx >> 2] >> ((mx & 3) * 2)) & 3) != a)
+                break;
+            e++;
+        }
+        if (plain ? a >= 2 : a > 0)
+            cv_rect(x0 + x, y, e - x, 1, plain || a == 3 ? c : ux_mix(bg, c, a * 33));
+        x = e;
+    }
+}
+#endif
 
 /* a divider (LINE): a 1 px T_RULE line on the canvas, a cell edge for the host lint */
 static void cv_rule(int32_t x, int32_t y, int32_t w, int32_t h)

@@ -1387,6 +1387,9 @@ static const char *const SPLASH_LINES[] = {"NEON", "SYNTHWAVE GROOVEBOX", "NEON 
 #define SPL_SUN_Y 122                               /* the sun: its centre and radius (cut by the horizon) */
 #define SPL_SUN_R 52
 #define SPL_GOLD 0xFE8Cu                            /* (255, 209, 102): SUNSET's sun top */
+#define SPL_LOGO_D 86                               /* NEON: the logo: its size, standing on the horizon */
+#define SPL_LOGO_Y (SPL_HZ - SPL_LOGO_D)
+#if !FELUCCA_NEON
 static int32_t spl_isqrt(int32_t v)
 {
     int32_t r = 0;
@@ -1394,11 +1397,14 @@ static int32_t spl_isqrt(int32_t v)
         r++;
     return r;
 }
+#endif
 /* the sun's stripes: the rows the sky shows through (three bands, wider down to the horizon) */
+#if !FELUCCA_NEON
 static int spl_stripe(int32_t y)
 {
     return (y >= 127 && y < 129) || (y >= 135 && y < 138) || (y >= 143 && y < 147);
 }
+#endif
 static void splash_pass(int32_t y0)
 {
     int plain = ux.pal_i == UI_GREY_INDEX || ux.pal_i == UI_BW_INDEX;   /* GREY, MONO: flat */
@@ -1413,10 +1419,20 @@ static void splash_pass(int32_t y0)
         int32_t dy = y - SPL_SUN_Y;
         if (y >= SPL_SKY0 && y < SPL_HZ && !plain)
             cv_rect(0, y, 240, 1, ux_mix(T_BG, sky, (y - SPL_SKY0) * 100 / (SPL_HZ - SPL_SKY0)));
+#if FELUCCA_NEON                                   /* NEON: the Neon Summers logo standing on the horizon */
+        if (y >= SPL_LOGO_Y && y < SPL_HZ) {
+            uint16_t bg = y >= SPL_SKY0 && !plain ? ux_mix(T_BG, sky, (y - SPL_SKY0) * 100 / (SPL_HZ - SPL_SKY0)) : T_BG;
+            int own = !plain && ux.pal_i == UI_DEFAULT_INDEX;   /* SUNSET: the logo's own colours */
+            uint16_t c = plain ? T_TEXT : ux_mix(T_TEXT, T_THEME, (y - SPL_LOGO_Y) * 100 / SPL_LOGO_D);
+            logo_row(y - SPL_LOGO_Y, SPL_LOGO_D, 120 - SPL_LOGO_D / 2, y, bg, c, own, plain);
+        }
+        (void)dy; (void)top; (void)sun0;
+#else
         if (y < SPL_HZ && dy * dy < SPL_SUN_R * SPL_SUN_R && !spl_stripe(y)) {
             int32_t hw = spl_isqrt(SPL_SUN_R * SPL_SUN_R - dy * dy);
             cv_rect(120 - hw, y, 2 * hw, 1, plain ? sun0 : ux_mix(sun0, T_THEME, (y - top) * 100 / (SPL_HZ - top)));
         }
+#endif
         if (y == SPL_HZ || y == SPL_HZ + 1)
             cv_rect(0, y, 240, 1, hue);
         if (y > SPL_HZ + 1 && y < SPL_GND1) {

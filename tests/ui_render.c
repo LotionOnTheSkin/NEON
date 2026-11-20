@@ -1706,8 +1706,18 @@ static void draw(int s)
             int32_t x, bad = hz == bg;
             for (x = 0; x < 240; x++)
                 bad |= host_screen[150u * 240u + (uint32_t)x] != hz || host_screen[151u * 240u + (uint32_t)x] != hz;
+#if FELUCCA_NEON
+            {   /* NEON: the logo on the sky: most of its middle drawn */
+                uint32_t on = 0, yy, xx;
+                for (yy = 70; yy < 146u; yy++)
+                    for (xx = 90; xx < 150u; xx++)
+                        on += host_screen[yy * 240u + xx] != host_screen[yy * 240u + 4u];
+                bad |= on < 2000u;
+            }
+#else
             bad |= host_screen[100u * 240u + 120u] == host_screen[100u * 240u + 4u];     /* the sun on the sky */
             bad |= host_screen[136u * 240u + 120u] != host_screen[136u * 240u + 4u];     /* a stripe: the sky through */
+#endif
             bad |= host_screen[239u * 240u + 239u] != bg || host_screen[2u * 240u + 239u] != bg;
             if (bad) {
                 if (rep) fprintf(rep, "FIND %-26s the splash's horizon, sun, stripes or corners are not as drawn\n", cur_name);
