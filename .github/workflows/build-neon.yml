@@ -27,6 +27,7 @@ concurrency:
 env:
   # the release version: a tag vX.Y, or the version typed when running by hand; empty: no release
   NEON_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version && format('v{0}', inputs.version) || '' }}
+  # (a typed version is tidied in the Build step: "v0.2", " 0.2 " and ".2" all mean 0.2)
 
 jobs:
   build:
@@ -80,6 +81,11 @@ jobs:
 
       - name: Build
         run: |
+          if [ -n "$NEON_VERSION" ]; then
+            v=$(printf '%s' "$NEON_VERSION" | tr -d ' ' | sed 's/^[vV]*//; s/^\./0./')
+            NEON_VERSION="v$v"; echo "NEON_VERSION=$NEON_VERSION" >> "$GITHUB_ENV"
+            echo "release version: $NEON_VERSION"
+          fi
           if [ -n "$NEON_VERSION" ]; then ./build.sh --release "${NEON_VERSION#v}"; else ./build.sh; fi
 
       - name: Name the package
